@@ -53,7 +53,7 @@ function stopwatch(func)
     return function(...)
         local time = os.clock() * 1000
         local data = func(...)
-        print(func.name.." taken "..((os.clock() * 1000) - time).."ms to execute")
+        print("taken "..((os.clock() * 1000) - time).."ms to execute")
         return data
     end
 end
@@ -68,6 +68,29 @@ function someMathIntensiveFunction(pow: number = 100)
 end
 
 someMathIntensiveFunction(100)
+
+-- Decorator on class
+@stopwatch
+class MyClass {
+    constructor = function()
+        print("MyClass constructor")
+    end
+}
+
+-- Decorator on table/class fields
+class MyClass {
+    @stopwatch
+    method = function()
+        print("MyClass method")
+    end
+}
+
+local tab = {
+    @stopwatch
+    method = function()
+        print("MyClass method")
+    end
+}
 
 -- Compact function
 local tab = {3, 10, 50, 20, 5}

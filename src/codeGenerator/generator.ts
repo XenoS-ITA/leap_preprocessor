@@ -508,13 +508,17 @@ class CodeGenerator extends LuaListener {
 
     enterClass = (ctx: ClassContext):string => {
         const code = new Code();
+        const decorList = ctx.decorator_list()
+        const name = this.enterIdentifier(ctx.identifier(0));
+
+        this.convertDecoratorList(decorList, code, name, "enterClass");
 
         this.classBuildInjected = true
         this.injecter.enableGlobalFeature("classBuilder");
 
         code.add("_leap_internal_classBuilder(")
         code.add("\"")
-        code.add(ctx.identifier(0), this.enterIdentifier)
+        code.add(ctx.identifier(0), this.enterIdentifier, true)
         code.add("\"")
 
         code.add(",")
@@ -529,7 +533,10 @@ class CodeGenerator extends LuaListener {
         } else {
             code.add(", {}")
         }
+
         code.add(")")
+
+        this.injecter.injectIfNeeded(code);
 
         return code.get();
     };
@@ -651,8 +658,44 @@ class CodeGenerator extends LuaListener {
 
     enterField = (ctx: FieldContext): string => {
         const code = new Code();
+        const decorator_list = ctx.decorator_list();
 
-        if (ctx.OB()) {
+        if (decorator_list.length > 0) {
+            let funcName = "";
+
+            if (ctx.OB()) {
+                funcName = this.enterExp(ctx.exp(0))
+
+                code.add(ctx.OB())
+                code.add(ctx.exp(0), this.enterExp);
+                code.add(ctx.CB())
+    
+                code.add(ctx.EQ())
+
+            } else if (ctx.identifier()) {
+                funcName = this.enterIdentifier(ctx.identifier())
+
+                code.add(ctx.identifier())
+                code.add(ctx.EQ())
+            }
+
+            // Open special decorator
+            decorator_list.forEach(decorator => {
+                code.add(decorator.var_(), this.enterVar);
+                code.add("(");
+            })
+
+            code.add(ctx.functiondef(), this.enterFunctiondef);
+            
+            // Close special decorator
+            decorator_list.forEach((decorator) => {
+                const decBody = this.enterDecoratorbody(decorator.decoratorbody())
+                if (decBody) { code.add(`, ${decBody}`) }
+
+                code.add(")");
+            })
+
+        } else if (ctx.OB()) {
             code.add(ctx.OB())
             code.add(ctx.exp(0), this.enterExp);
             code.add(ctx.CB())
@@ -766,6 +809,17 @@ class CodeGenerator extends LuaListener {
         return 'goto ' + ctx.identifier().getText();
     }
 
+    convertDecoratorList = (decorList: DecoratorContext[], code: Code, funcName: string, injectAfter: string) => {
+        if (decorList) {
+            const decoratorWithFuncName = (node: DecoratorContext) => this.convertDecorator(funcName, node, injectAfter);
+
+            // We need to consume the decorators lines
+            decorList.forEach(decorator => {
+                code.add(decorator, decoratorWithFuncName);
+            })
+        }
+    }
+    
     convertDo = (ctx: StatContext): string => {
         const code = new Code();
 
@@ -939,12 +993,11 @@ class CodeGenerator extends LuaListener {
         return code.get();
     }
 
-    convertDecorator = (func: FuncnameContext, ctx: DecoratorContext): string => {
+    convertDecorator = (funcName: string, ctx: DecoratorContext, injectAfter?: string): string => {
         const decoratorName = this.enterVar(ctx.var_())
-        const funcName = this.enterFuncname(func)
         const decBody = this.enterDecoratorbody(ctx.decoratorbody())
 
-        this.injecter.inNext("convertFunction", CodeSnippets.decorator(funcName, decoratorName, decBody))
+        this.injecter.inNext(injectAfter, CodeSnippets.decorator(funcName, decoratorName, decBody))
 
         return " "
     }
@@ -952,15 +1005,10 @@ class CodeGenerator extends LuaListener {
     convertFunction = (ctx: StatContext): string => {
         const code = new Code();
         const decorList = ctx.decorator_list()
-        
-        if (decorList) {
-            const decoratorWithFuncName = (node: DecoratorContext) => this.convertDecorator(ctx.funcname(), node)
+        const name = this.enterFuncname(ctx.funcname());
 
-            decorList.forEach(decorator => {
-                code.add(decorator, decoratorWithFuncName);
-            })
-        }
-        
+        this.convertDecoratorList(decorList, code, name, "convertFunction");
+
         code.add(ctx.FUNCTION());
         code.add(ctx.funcname(), this.enterFuncname);
         code.add(ctx.funcbody(), this.enterFuncbody);

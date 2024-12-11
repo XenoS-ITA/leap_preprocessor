@@ -181,7 +181,7 @@ funcbody
     ;
 
 class
-    : 'class' identifier ('extends' identifier)? tableconstructor
+    : decorator* 'class' identifier ('extends' identifier)? tableconstructor
     ;
 
 partype
@@ -220,7 +220,9 @@ fieldlist
     ;
 
 field
-    : '[' exp ']' '=' exp
+    : decorator+ '[' exp ']' '=' functiondef
+    | decorator+  identifier '=' functiondef
+    | '[' exp ']' '=' exp
     | '.' identifier // cfxlua (setconstructor)
     | identifier '=' exp
     | exp

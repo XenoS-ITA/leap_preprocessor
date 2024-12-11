@@ -35,14 +35,8 @@ namespace CodeSnippets {
     export function decorator(funcName: string, decoratorName: string, decBody?: string) {
         let codeToInject: string = "";
 
-        codeToInject += ";"
-        codeToInject += `${funcName} = ${decoratorName}`
-        codeToInject += `(setmetatable({name = "${funcName}", og = ${funcName}}, {__call = function(self, ...) return self.og(...) end})`
-
-        if (decBody) {
-            codeToInject += `, ${decBody}`
-        }
-
+        codeToInject += `;${funcName} = ${decoratorName}(${funcName}`
+        if (decBody) { codeToInject += `, ${decBody}` }
         codeToInject += `)`
 
         return codeToInject

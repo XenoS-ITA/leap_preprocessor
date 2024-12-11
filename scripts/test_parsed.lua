@@ -1,4 +1,4 @@
-if not leap then leap={}end;if not leap.deserialize then leap.deserialize=function(a)if type(a)=="table"and a.__type then local b=_G[a.__type]if b then b.__skipNextConstructor=true;local c=b()for d,e in pairs(a)do c[d]=e end;return c else error("Class '"..a.__type.."' not found",2)end end end end;if not _type then _type=type;type=function(f)local g=_type(f)if g=="table"and f.__type then return f.__type else return g end end end;if not _leap_internal_in_operator then _leap_internal_in_operator=function(a,b)local c=type(b)if c=="table"then if table.type(b)=="array"then for d,e in pairs(b)do if e==a then return true end end elseif table.type(b)=="hash"then for d,e in pairs(b)do if d==a then return true end end else for d,e in pairs(b)do if e==a or d==a then return true end end end elseif c=="string"then return b:find(a)else error("in operator: unsupported type "..c)end;return false end end;if not _leap_internal_classBuilder then _leap_internal_classBuilder=function(a,b,c)if not c then error("ExtendingNotDefined: "..a.." tried to extend a class that is not defined",2)end;if c.__prototype then b.super=c end;_G[a]=setmetatable({__type=a,__prototype=b},{__newindex=function(self,d,e)if d:sub(1,2)=="__"then rawset(self,d,e)else error("attempt to assign class property '"..d.."' directly, please instantiate the class before assigning any properties",2)end end,__call=function(self,...)local f=setmetatable({__type=self.__type},{__index=function(g,h)if self.__prototype.super then return self.__prototype[h]or self.__prototype.super.__prototype[h]else return self.__prototype[h]end end,__gc=function(g)if g.destructor then g:destructor()end end})if not self.__skipNextConstructor then if f.constructor then f:constructor(...)end end;self.__skipNextConstructor=nil;return f end})end end;  
+if not leap then leap={}end;if not leap.deserialize then leap.deserialize=function(a)if type(a)=="table"and a.__type then local b=_G[a.__type]if b then b.__skipNextConstructor=true;local c=b()for d,e in pairs(a)do c[d]=e end;return c else error("Class '"..a.__type.."' not found",2)end end end end;if not _type then _type=type;type=function(f)local g=_type(f)if g=="table"and f.__type then return f.__type else return g end end end;if not _leap_internal_in_operator then _leap_internal_in_operator=function(a,b)local c=type(b)if c=="table"then if table.type(b)=="array"then for d,e in pairs(b)do if e==a then return true end end elseif table.type(b)=="hash"then for d,e in pairs(b)do if d==a then return true end end else for d,e in pairs(b)do if e==a or d==a then return true end end end elseif c=="string"then return b:find(a)else error("in operator: unsupported type "..c)end;return false end end;if not _leap_internal_classBuilder then _leap_internal_classBuilder=function(a,b,c)if not c then error("ExtendingNotDefined: "..a.." tried to extend a class that is not defined",2)end;if c.__prototype then b.super=setmetatable({__type=c.__type,__prototype=c.__prototype},{__index=c.__prototype,__call=c,__newindex=function(self,d)error("attempted to assign class property '"..d.."' directly, please instantiate the class before assigning any properties",2)end})end;_G[a]=setmetatable({__type=a,__prototype=b},{__newindex=function(self,d,e)if d:sub(1,2)=="__"then rawset(self,d,e)else error("attempt to assign class property '"..d.."' directly, please instantiate the class before assigning any properties",2)end end,__call=function(self,...)local f=setmetatable({__type=self.__type},{__index=function(g,h)if self.__prototype.super then return self.__prototype[h]or self.__prototype.super.__prototype[h]else return self.__prototype[h]end end,__gc=function(g)if g.destructor then g:destructor()end end})if not self.__skipNextConstructor then if f.constructor then f:constructor(...)end end;self.__skipNextConstructor=nil;return f end})end end;  
 function addNumbers(numA, numB)if type(numA) ~= "number" then error('numA: must be (number) but got '..type(numA)) end;if type(numB) ~= "number" then error('numB: must be (number) but got '..type(numB)) end;
     return numA + numB
 end
@@ -18,7 +18,7 @@ if result ~= 4 then
 end
 
  
-_leap_internal_classBuilder("Car", {
+_leap_internal_classBuilder("Car",{
     brand = "Example",
     velocity = 0,
 
@@ -27,15 +27,16 @@ _leap_internal_classBuilder("Car", {
     end
 }, {})
 
-_leap_internal_classBuilder("Dragster",   {
+_leap_internal_classBuilder("Dragster",{
     brand = "Example Dragster",
 
     constructor = function(self)
+             
         self.super(200)
     end
 }, Car)
 
-_leap_internal_classBuilder("MyError", {
+_leap_internal_classBuilder("MyError",{
     constructor = function(self, reason)if type(reason) ~= "string" then error('reason: must be (string) but got '..type(reason)) end;
         self.reason = reason
     end
@@ -52,7 +53,7 @@ function stopwatch(func)
     return function(...)
         local time = os.clock() * 1000
         local data = func(...)
-        print(func.name.." taken "..((os.clock() * 1000) - time).."ms to execute")
+        print("taken "..((os.clock() * 1000) - time).."ms to execute")
         return data
     end
 end
@@ -64,9 +65,32 @@ function someMathIntensiveFunction(pow)if pow == nil then pow = 100 end;if type(
     end
 
     return math.pow(10, pow)
-end;someMathIntensiveFunction = stopwatch(setmetatable({name = "someMathIntensiveFunction", og = someMathIntensiveFunction}, {__call = function(self, ...) return self.og(...) end}))
+end;someMathIntensiveFunction = stopwatch(someMathIntensiveFunction)
 
 someMathIntensiveFunction(100)
+
+   
+ _leap_internal_classBuilder("MyClass",
+  {
+    constructor = function(self)
+        print("MyClass constructor")
+    end
+}, {});MyClass = stopwatch(MyClass)
+
+    
+_leap_internal_classBuilder("MyClass",{
+    method =stopwatch(
+      function(self)
+        print("MyClass method")
+    end)
+}, {})
+
+local tab = {
+    method =stopwatch(
+      function()
+        print("MyClass method")
+    end)
+}
 
   
 local tab = {3, 10, 50, 20, 5}
