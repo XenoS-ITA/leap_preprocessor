@@ -57,7 +57,7 @@ function stopwatch(func)
     return function(...)
         local time = os.clock() * 1000
         local data = func(...)
-        print("taken "..((os.clock() * 1000) - time).."ms to execute")
+        print(func.name .. " taken "..((os.clock() * 1000) - time).."ms to execute")
         return data
     end
 end

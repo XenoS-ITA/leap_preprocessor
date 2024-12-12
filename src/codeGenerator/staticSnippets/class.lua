@@ -44,16 +44,17 @@ if not _leap_internal_classBuilder then
                         end
                     end
                 })
-        
+                
+                if obj._leap_internal_decorators then
+                    obj:_leap_internal_decorators()
+                end
+                
                 if not self.__skipNextConstructor then
                     if obj.constructor then
                         obj:constructor(...)
                     end
                 end
 
-                if obj._leap_internal_decorators then
-                    obj:_leap_internal_decorators()
-                end
     
                 self.__skipNextConstructor = nil
                 return obj

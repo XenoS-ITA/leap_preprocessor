@@ -32,10 +32,16 @@ namespace CodeSnippets {
         return codeToInject
     }
 
+    function decoratorMetatable(funcName: string, self?: boolean) {
+        return `setmetatable({name = "${funcName}", og = ${self ? "self." : ""}${funcName}}, {__index = ${self ? "self." : ""}${funcName}, __call = function(__, ...) return __.og(${self ? "self," : ""}...) end})`
+    }
+
     export function decorator(funcName: string, decoratorName: string, decBody?: string) {
         let codeToInject: string = "";
 
-        codeToInject += `;${funcName} = ${decoratorName}(${funcName}`
+        
+
+        codeToInject += `;${funcName} = ${decoratorName}(${decoratorMetatable(funcName)}`
         if (decBody) { codeToInject += `, ${decBody}` }
         codeToInject += `)`
 
@@ -53,7 +59,7 @@ namespace CodeSnippets {
     export function classDecorator(funcName: string, decoratorName: string, decBody?: string) {
         let codeToInject: string = "";
 
-        codeToInject += `self.${funcName} = ${decoratorName}(self, self.${funcName}`
+        codeToInject += `self.${funcName} = ${decoratorName}(self, ${decoratorMetatable(funcName, true)}`
 
         if (decBody) {
             codeToInject += `, ${decBody}`
