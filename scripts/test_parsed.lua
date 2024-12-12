@@ -1,4 +1,4 @@
-if not leap then leap={}end;if not leap.deserialize then leap.deserialize=function(a)if type(a)=="table"and a.__type then local b=_G[a.__type]if b then b.__skipNextConstructor=true;local c=b()for d,e in pairs(a)do c[d]=e end;return c else error("Class '"..a.__type.."' not found",2)end end end end;if not _type then _type=type;type=function(f)local g=_type(f)if g=="table"and f.__type then return f.__type else return g end end end;if not _leap_internal_in_operator then _leap_internal_in_operator=function(a,b)local c=type(b)if c=="table"then if table.type(b)=="array"then for d,e in pairs(b)do if e==a then return true end end elseif table.type(b)=="hash"then for d,e in pairs(b)do if d==a then return true end end else for d,e in pairs(b)do if e==a or d==a then return true end end end elseif c=="string"then return b:find(a)else error("in operator: unsupported type "..c)end;return false end end;if not _leap_internal_classBuilder then _leap_internal_classBuilder=function(a,b,c)if not c then error("ExtendingNotDefined: "..a.." tried to extend a class that is not defined",2)end;if c.__prototype then b.super=setmetatable({__type=c.__type,__prototype=c.__prototype},{__index=c.__prototype,__call=c,__newindex=function(self,d)error("attempted to assign class property '"..d.."' directly, please instantiate the class before assigning any properties",2)end})end;_G[a]=setmetatable({__type=a,__prototype=b},{__newindex=function(self,d,e)if d:sub(1,2)=="__"then rawset(self,d,e)else error("attempt to assign class property '"..d.."' directly, please instantiate the class before assigning any properties",2)end end,__call=function(self,...)local f=setmetatable({__type=self.__type},{__index=function(g,h)if self.__prototype.super then return self.__prototype[h]or self.__prototype.super.__prototype[h]else return self.__prototype[h]end end,__gc=function(g)if g.destructor then g:destructor()end end})if not self.__skipNextConstructor then if f.constructor then f:constructor(...)end end;self.__skipNextConstructor=nil;return f end})end end;  
+if not leap then leap={}end;if not leap.deserialize then leap.deserialize=function(a)if type(a)=="table"and a.__type then local b=_G[a.__type]if b then b.__skipNextConstructor=true;local c=b()for d,e in pairs(a)do c[d]=e end;return c else error("Class '"..a.__type.."' not found",2)end end end end;if not _type then _type=type;type=function(f)local g=_type(f)if g=="table"and f.__type then return f.__type else return g end end end;if not _leap_internal_in_operator then _leap_internal_in_operator=function(a,b)local c=type(b)if c=="table"then if table.type(b)=="array"then for d,e in pairs(b)do if e==a then return true end end elseif table.type(b)=="hash"then for d,e in pairs(b)do if d==a then return true end end else for d,e in pairs(b)do if e==a or d==a then return true end end end elseif c=="string"then return b:find(a)else error("in operator: unsupported type "..c)end;return false end end;if not _leap_internal_classBuilder then _leap_internal_classBuilder=function(a,b,c)if not c then error("ExtendingNotDefined: "..a.." tried to extend a class that is not defined",2)end;if c.__prototype then b.super=setmetatable({__type=c.__type,__prototype=c.__prototype},{__index=c.__prototype,__call=c,__newindex=function(self,d)error("attempted to assign class property '"..d.."' directly, please instantiate the class before assigning any properties",2)end})end;_G[a]=setmetatable({__type=a,__prototype=b},{__newindex=function(self,d,e)if d:sub(1,2)=="__"then rawset(self,d,e)else error("attempt to assign class property '"..d.."' directly, please instantiate the class before assigning any properties",2)end end,__call=function(self,...)local f=setmetatable({__type=self.__type},{__index=function(g,h)if self.__prototype.super then return self.__prototype[h]or self.__prototype.super.__prototype[h]else return self.__prototype[h]end end,__gc=function(g)if g.destructor then g:destructor()end end,__tostring=function(g)if g.toString then return g:toString()else return type(g)end end})if not self.__skipNextConstructor then if f.constructor then f:constructor(...)end end;if f._leap_internal_decorators then f:_leap_internal_decorators()end;self.__skipNextConstructor=nil;return f end})end;_leap_internal_classBuilder("Error",{constructor=function(self,i)self.message=i end,toString=function(self)return type(self)..": "..self.message end},{})end;  
 function addNumbers(numA, numB)if type(numA) ~= "number" then error('numA: must be (number) but got '..type(numA)) end;if type(numB) ~= "number" then error('numB: must be (number) but got '..type(numB)) end;
     return numA + numB
 end
@@ -37,10 +37,14 @@ _leap_internal_classBuilder("Dragster",{
 }, Car)
 
 _leap_internal_classBuilder("MyError",{
-    constructor = function(self, reason)if type(reason) ~= "string" then error('reason: must be (string) but got '..type(reason)) end;
-        self.reason = reason
+    constructor = function(self, message)if type(message) ~= "string" then error('message: must be (string) but got '..type(message)) end;
+        self.message = message .. "Test"
+    end,
+
+    toString = function(self, self)
+        return "Custom error message "
     end
-}, {})
+}, Error)
 
   
 local car = Car()
@@ -79,18 +83,11 @@ someMathIntensiveFunction(100)
 
     
 _leap_internal_classBuilder("MyClass",{
-    method =stopwatch(
-      function(self)
+    
+      method = function(self)
         print("MyClass method")
-    end)
-}, {})
-
-local tab = {
-    method =stopwatch(
-      function()
-        print("MyClass method")
-    end)
-}
+    end
+}, {})MyClass.__prototype._leap_internal_decorators = function(self) self.method = stopwatch(self, self.method);end
 
   
 local tab = {3, 10, 50, 20, 5}
@@ -141,7 +138,9 @@ end) if not _leap_internal_status then local  e = _leap_internal_result;
 local _leap_internal_status, _leap_internal_result = pcall(function() 
     error(MyError("This is the reason"))
 end) if not _leap_internal_status then local  myError = _leap_internal_result; 
-    print(myError.reason)
+    if type(myError) == "MyError" then
+        print(myError)
+    end
  elseif _leap_internal_result ~= nil then return _leap_internal_result end;
 
   

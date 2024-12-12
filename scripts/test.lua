@@ -36,9 +36,13 @@ class Dragster extends Car {
     end
 }
 
-class MyError {
-    constructor = function(reason: string)
-        self.reason = reason
+class MyError extends Error {
+    constructor = function(message: string)
+        self.message = message .. "Test"
+    end,
+
+    toString = function(self)
+        return "Custom error message "
     end
 }
 
@@ -79,13 +83,6 @@ class MyClass {
 
 -- Decorator on table/class fields
 class MyClass {
-    @stopwatch
-    method = function()
-        print("MyClass method")
-    end
-}
-
-local tab = {
     @stopwatch
     method = function()
         print("MyClass method")
@@ -141,7 +138,9 @@ end
 try 
     throw new MyError("This is the reason")
 catch myError then
-    print(myError.reason)
+    if type(myError) == "MyError" then
+        print(myError)
+    end
 end
 
 -- Continue keyword

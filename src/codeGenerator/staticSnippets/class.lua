@@ -35,6 +35,13 @@ if not _leap_internal_classBuilder then
                         if _self.destructor then
                             _self:destructor()
                         end
+                    end,
+                    __tostring = function (_self)
+                        if _self.toString then
+                            return _self:toString()
+                        else
+                            return type(_self)
+                        end
                     end
                 })
         
@@ -43,10 +50,24 @@ if not _leap_internal_classBuilder then
                         obj:constructor(...)
                     end
                 end
+
+                if obj._leap_internal_decorators then
+                    obj:_leap_internal_decorators()
+                end
     
                 self.__skipNextConstructor = nil
                 return obj
             end
         })
     end
+
+    _leap_internal_classBuilder("Error", {
+        constructor = function(self, message)
+            self.message = message
+        end,
+
+        toString = function(self)
+            return type(self)..": "..self.message
+        end
+    }, {})
 end

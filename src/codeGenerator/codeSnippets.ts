@@ -42,6 +42,28 @@ namespace CodeSnippets {
         return codeToInject
     }
 
+    export function classDecoratorStart(className: string, funcName: string) {
+        let codeToInject: string = "";
+
+        codeToInject += `${className}.__prototype._leap_internal_decorators = function(self) `
+
+        return codeToInject
+    }
+
+    export function classDecorator(funcName: string, decoratorName: string, decBody?: string) {
+        let codeToInject: string = "";
+
+        codeToInject += `self.${funcName} = ${decoratorName}(self, self.${funcName}`
+
+        if (decBody) {
+            codeToInject += `, ${decBody}`
+        }
+
+        codeToInject += `);`
+
+        return codeToInject
+    }
+
     // Features
     export function alwaysInjected() {
         return always

@@ -21,7 +21,8 @@ class Code extends CodeManager {
 class CodeGenerator extends LuaListener {
     firstStat: boolean = true
     injecter: Injecter
-    insideClass: boolean;
+    insideClass: string;
+    insideTryCatch: boolean;
 
     forDepth: number = 0
 
@@ -496,12 +497,12 @@ class CodeGenerator extends LuaListener {
         this.injecter.injectIfNeeded(code);
 
         const savedInsideClass = this.insideClass;
-        if (savedInsideClass) this.insideClass = false;
+        if (savedInsideClass) this.insideClass = null;
 
         code.add(ctx.block(), this.enterBlock)
         code.add(ctx.END())
 
-        if (savedInsideClass) this.insideClass = true;
+        if (savedInsideClass) this.insideClass = savedInsideClass;
 
         return code.get();
     }
@@ -523,9 +524,9 @@ class CodeGenerator extends LuaListener {
 
         code.add(",")
 
-        this.insideClass = true;
+        this.insideClass = name;
         code.add(ctx.tableconstructor(), this.enterTableconstructor)
-        this.insideClass = false;
+        this.insideClass = null;
 
         if (ctx.EXTENDS()) {
             code.add(", ")
@@ -663,6 +664,9 @@ class CodeGenerator extends LuaListener {
         if (decorator_list.length > 0) {
             let funcName = "";
 
+            // Preserve decorators spaces
+            code.addSpaces(ctx.decorator_list()[0], ctx.functiondef());
+
             if (ctx.OB()) {
                 funcName = this.enterExp(ctx.exp(0))
 
@@ -679,21 +683,19 @@ class CodeGenerator extends LuaListener {
                 code.add(ctx.EQ())
             }
 
-            // Open special decorator
+            this.injecter.inNext("enterClass", CodeSnippets.classDecoratorStart(this.insideClass, funcName))
+
             decorator_list.forEach(decorator => {
-                code.add(decorator.var_(), this.enterVar);
-                code.add("(");
+                const name = this.enterVar(decorator.var_())
+                const body = this.enterDecoratorbody(decorator.decoratorbody())
+
+                this.injecter.inNext("enterClass", CodeSnippets.classDecorator(funcName, name, body))
             })
+
+            this.injecter.inNext("enterClass", "end")
+
 
             code.add(ctx.functiondef(), this.enterFunctiondef);
-            
-            // Close special decorator
-            decorator_list.forEach((decorator) => {
-                const decBody = this.enterDecoratorbody(decorator.decoratorbody())
-                if (decBody) { code.add(`, ${decBody}`) }
-
-                code.add(")");
-            })
 
         } else if (ctx.OB()) {
             code.add(ctx.OB())
@@ -845,6 +847,8 @@ class CodeGenerator extends LuaListener {
 
         code.add("local _leap_internal_status, _leap_internal_result = pcall(function()")
 
+        this.insideTryCatch = true;
+
             // Manually handle spaces since we discard the TRY and CATCH tokens
             code.addSpaces(ctx.TRY(), ctx.block(0)); // TRY > BLOCK
             code.add(ctx.block(0), this.enterBlock);
@@ -852,6 +856,8 @@ class CodeGenerator extends LuaListener {
 
             // Set last node as CATCH (so that the identifier spaces will be handled correctly)
             code.lastNode = ctx.CATCH();
+
+        this.insideTryCatch = false;
 
         code.add(`end) if not _leap_internal_status then local `);
         code.add(ctx.identifier(), this.enterIdentifier);
@@ -867,8 +873,12 @@ class CodeGenerator extends LuaListener {
         return code.get();
     }
 
-    convertThrow = (ctx: StatContext): string => {
-        return "error(" + this.enterExp(ctx.exp(0)) + ")"
+    convertThrow = (ctx: StatContext): string => { 
+        if (this.insideTryCatch) {
+            return `error(${this.enterExp(ctx.exp(0))})`
+        } else {
+            return `error(tostring(${this.enterExp(ctx.exp(0))}))`
+        }
     }
 
     convertTernary = (ctx: ExpContext): string => {
