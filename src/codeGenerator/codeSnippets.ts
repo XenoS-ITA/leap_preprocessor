@@ -17,7 +17,7 @@ namespace CodeSnippets {
         })
 
         const typesText = partypelist.map(type => type.getText()).join(" | ")
-        codeToInject += ` then error('${paramText}: must be (${typesText}) but got '..type(${paramText})) end;`
+        codeToInject += ` then error('${paramText}: must be (${typesText}) but got '..type(${paramText}), 2) end;`
 
         return codeToInject
     }
