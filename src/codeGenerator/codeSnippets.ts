@@ -2,6 +2,7 @@ import { IdentifierContext } from "../grammar/LuaParser";
 import always from "./staticSnippets/always.lua";
 import classCode from "./staticSnippets/class.lua";
 import inOp from "./staticSnippets/in.lua";
+import usingOp from "./staticSnippets/using.lua";
 
 namespace CodeSnippets {
     export function typeCheck(partypelist: IdentifierContext[], param: IdentifierContext) {
@@ -33,39 +34,32 @@ namespace CodeSnippets {
     }
 
     function decoratorMetatable(funcName: string, self?: boolean) {
-        return `setmetatable({name = "${funcName}", og = ${self ? "self." : ""}${funcName}}, {__index = ${self ? "self." : ""}${funcName}, __call = function(__, ...) return __.og(${self ? "self," : ""}...) end})`
+        let codeToInject: string = "";
+
+        codeToInject += `setmetatable(`
+            codeToInject += `{name = "${funcName}", og = ${self ? "self." : ""}${funcName}}`
+            codeToInject += `, `
+            codeToInject += `{__index = ${self ? "self." : ""}${funcName}, __call = function(__, ...) return __.og(${self ? "self," : ""}...) end}`
+        codeToInject += ")"
+
+        return codeToInject
     }
 
     export function decorator(funcName: string, decoratorName: string, decBody?: string) {
         let codeToInject: string = "";
 
-        
-
         codeToInject += `;${funcName} = ${decoratorName}(${decoratorMetatable(funcName)}`
         if (decBody) { codeToInject += `, ${decBody}` }
         codeToInject += `)`
+        codeToInject += `?.og or ${funcName};` // Preserve function without metatable garbage (fallback to original function)
 
         return codeToInject
     }
 
-    export function classDecoratorStart(className: string, funcName: string) {
+    export function classDecorator(className:string, funcName: string, decoratorName: string, decBody?: string) {
         let codeToInject: string = "";
 
-        codeToInject += `${className}.__prototype._leap_internal_decorators = function(self) `
-
-        return codeToInject
-    }
-
-    export function classDecorator(funcName: string, decoratorName: string, decBody?: string) {
-        let codeToInject: string = "";
-
-        codeToInject += `self.${funcName} = ${decoratorName}(self, ${decoratorMetatable(funcName, true)}`
-
-        if (decBody) {
-            codeToInject += `, ${decBody}`
-        }
-
-        codeToInject += `);`
+        codeToInject += `table.insert(${className}.__prototype._leap_internal_decorators, {name = "${funcName}", decoratorName = "${decoratorName}", args = {${decBody || ""}}});`
 
         return codeToInject
     }
@@ -81,6 +75,10 @@ namespace CodeSnippets {
 
     export function inOperator() {
         return inOp
+    }
+
+    export function usingOperator() {
+        return usingOp
     }
 }
 

@@ -1,5 +1,5 @@
 import { ParserRuleContext, TerminalNode } from 'antlr4';
-import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext } from '../grammar/LuaParser.js';
+import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext, FilterfieldContext, FilterfieldlistContext } from '../grammar/LuaParser.js';
 import LuaListener from '../grammar/LuaParserListener.js';
 import Utils from './utils.js';
 import CodeManager from './manager.js';
@@ -125,6 +125,10 @@ class CodeGenerator extends LuaListener {
             } else {
                 return this.convertFunction(ctx);
             }
+        } else if (ctx.FILTER()) {
+            return this.convertFilter(ctx);
+        } else if (ctx.USING()) {
+            return this.convertUsing(ctx);
         } else if (ctx.LOCAL()) {
             return this.convertLocal(ctx);
         }
@@ -267,6 +271,37 @@ class CodeGenerator extends LuaListener {
         } else if (ctx.exp(0)) {
             return this.handleOperators(ctx);
         }
+    }
+
+    enterFilterfield = (ctx: FilterfieldContext) => {
+        const code = new Code();
+
+        code.add("assert(")
+        code.add(ctx.exp(), this.enterExp);
+
+        if (ctx.ELSE()) {
+            code.add(", ")
+            code.add(ctx.explist(), this.enterExplist);
+        }
+
+        code.add(")");
+
+        return code.get();
+    };
+
+    enterFilterfieldlist = (ctx: FilterfieldlistContext): string => {
+        const code = new Code();
+        const fieldList = ctx.filterfield_list();
+        const fieldsepList = ctx.fieldsep_list();
+
+        code.add(fieldList[0], this.enterFilterfield);
+
+        for (let i = 1; i < fieldList.length; i++) {
+            // -1 since field sep is between fields and dont exist 100% initially
+            code.add(fieldList[i], this.enterFilterfield);
+        }
+
+        return code.get();
     }
 
     enterTablecomprehension = (ctx: TablecomprehensionContext) => {
@@ -683,16 +718,14 @@ class CodeGenerator extends LuaListener {
                 code.add(ctx.EQ())
             }
 
-            this.injecter.inNext("enterClass", CodeSnippets.classDecoratorStart(this.insideClass, funcName))
-
             decorator_list.forEach(decorator => {
                 const name = this.enterVar(decorator.var_())
                 const body = this.enterDecoratorbody(decorator.decoratorbody())
 
-                this.injecter.inNext("enterClass", CodeSnippets.classDecorator(funcName, name, body))
+                this.injecter.inNext("enterClass", CodeSnippets.classDecorator(this.insideClass, funcName, name, body))
             })
 
-            this.injecter.inNext("enterClass", "end")
+            //this.injecter.inNext("enterClass", "end")
 
 
             code.add(ctx.functiondef(), this.enterFunctiondef);
@@ -1024,6 +1057,49 @@ class CodeGenerator extends LuaListener {
         code.add(ctx.funcbody(), this.enterFuncbody);
 
         this.injecter.injectIfNeeded(code);
+
+        return code.get();
+    }
+
+    convertFilter = (ctx: StatContext): string => {
+        const code = new Code();
+        const filterfieldlist = ctx.filterfieldlist()
+        const filterfield_list = filterfieldlist.filterfield_list()
+
+        code.add(ctx.funcname(), this.enterFuncname);
+        code.add(" = ");
+        code.add("[[");
+        code.addSpaces(ctx.funcname(), filterfield_list.at(0)) // Add space after return (this ensures that the error message line is correct)
+        code.add("return function(");
+        
+        if (ctx.parlist()) {
+            code.add(ctx.parlist(), this.enterParlist);
+        }
+
+        code.add(") ");
+        code.add(this.enterFilterfieldlist(filterfieldlist));
+
+        code.addSpaces(filterfield_list.at(-1), ctx.END());
+        code.add("end]]");
+        
+        return code.get();
+    }
+    
+    convertUsing = (ctx: StatContext): string => {
+        const code = new Code();
+
+        this.injecter.enableGlobalFeature("usingOperator")
+
+        code.add("_leap_internal_using_operator(\"")
+        code.add(ctx.identifier(), this.enterIdentifier);
+        code.add("\"")
+        
+        if (ctx.explist()) {
+            code.add(",");
+            code.add(ctx.explist(), this.enterExplist);
+        }
+
+        code.add(")")
 
         return code.get();
     }

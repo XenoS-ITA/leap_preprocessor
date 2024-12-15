@@ -45,6 +45,8 @@ stat
     | 'do' block 'end'
     | decorator* 'function' funcname funcbody
     | decorator* 'local' 'function' identifier funcbody
+    | 'filter' funcname ('(' parlist ')')? filterfieldlist 'end'
+    | 'using' identifier ('(' explist? ')')?
     | 'local' attnamelist ('=' explist)?
     | 'local' attnamelist 'in' prefixexp // cfxlua
     | 'defer' block 'end' // cfxlua
@@ -88,6 +90,7 @@ decorator
 decoratorbody
     : ('(' explist? ')')?
     ;
+    
 
 newcall
     : 'new' functioncall
@@ -121,6 +124,15 @@ exp
     | exp 'in' exp
     | exp 'not' 'in' exp
     | exp '?' exp ':' exp
+    ;
+
+
+filterfield
+    : exp ('else' explist)?
+    ;
+
+filterfieldlist
+    : filterfield (fieldsep filterfield)* fieldsep?
     ;
 
 tablecomprehension

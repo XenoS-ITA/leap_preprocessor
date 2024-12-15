@@ -21,6 +21,8 @@ Think of it as an effective "modernity" leap into the future to make lua a featu
   - [X] Ternary operator
   # ${...}
   - [X] String Interpolation
+  - [X] Filter 
+  - [X] Using operator
 
 ## Leap v2 added features
   - [X] In operator

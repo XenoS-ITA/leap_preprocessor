@@ -16,6 +16,8 @@ EQ   : '=';
 NEW       : 'new';
 CLASS     : 'class';
 EXTENDS   : 'extends';
+USING     : 'using';
+FILTER    : 'filter';
 
 TRY       : 'try';
 CATCH     : 'catch';

@@ -151,3 +151,31 @@ for k, v in pairs(tab) do
 
     print("${k} = ${v}")
 end
+
+-- Filter example
+filter HaveRightsTo(action)
+    user.role == "admin" else "User is not admin!",
+    user.permissions[action] else "User dont have permission to ${action}!",
+end
+
+function editMessage(user: User) using HaveRightsTo("editMessage")
+    print("Message edited!")
+end
+
+--- Hypothetical class User
+class User {
+    role = "user",
+    permissions = {
+        editMessage = false,
+        deleteMessage = false
+    }
+}
+
+local user = new User()
+editMessage(user) -- HaveRightsTo:1: User is not admin! (Default role is user)
+
+user.role = "admin"
+editMessage(user) -- HaveRightsTo:2: User dont have permission to editMessage! (Default editMessage permission is false)
+
+user.permissions.editMessage = true
+editMessage(user) -- Message edited! (User role is admin and editMessage permission is true)

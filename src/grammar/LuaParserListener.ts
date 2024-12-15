@@ -19,6 +19,8 @@ import { DecoratorbodyContext } from "./LuaParser.js";
 import { NewcallContext } from "./LuaParser.js";
 import { ExplistContext } from "./LuaParser.js";
 import { ExpContext } from "./LuaParser.js";
+import { FilterfieldContext } from "./LuaParser.js";
+import { FilterfieldlistContext } from "./LuaParser.js";
 import { TablecomprehensionContext } from "./LuaParser.js";
 import { CompactfuncContext } from "./LuaParser.js";
 import { Indexed_memberContext } from "./LuaParser.js";
@@ -209,6 +211,26 @@ export default class LuaParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitExp?: (ctx: ExpContext) => void;
+	/**
+	 * Enter a parse tree produced by `LuaParser.filterfield`.
+	 * @param ctx the parse tree
+	 */
+	enterFilterfield?: (ctx: FilterfieldContext) => void;
+	/**
+	 * Exit a parse tree produced by `LuaParser.filterfield`.
+	 * @param ctx the parse tree
+	 */
+	exitFilterfield?: (ctx: FilterfieldContext) => void;
+	/**
+	 * Enter a parse tree produced by `LuaParser.filterfieldlist`.
+	 * @param ctx the parse tree
+	 */
+	enterFilterfieldlist?: (ctx: FilterfieldlistContext) => void;
+	/**
+	 * Exit a parse tree produced by `LuaParser.filterfieldlist`.
+	 * @param ctx the parse tree
+	 */
+	exitFilterfieldlist?: (ctx: FilterfieldlistContext) => void;
 	/**
 	 * Enter a parse tree produced by `LuaParser.tablecomprehension`.
 	 * @param ctx the parse tree
