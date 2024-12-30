@@ -249,6 +249,13 @@ fieldsep
 identifier
     : NAME
     | NEW
+    | CLASS
+    | EXTENDS
+    | USING
+    | FILTER
+    | TRY
+    | CATCH
+    | DEFER
     ;
 
 number
