@@ -1,5 +1,5 @@
 if not _leap_internal_using_operator then
-    _leap_internal_using_operator = function(_filter, ...)
+    _leap_internal_using_operator = function(_filter, ctx, ...)
         local filtername = _filter
         _filter = _G[_filter]
 
@@ -7,19 +7,12 @@ if not _leap_internal_using_operator then
             error("using operator expects a filter, got "..type(_filter), 2)
         end
 
+        local ddd = ctx.ddd
+        ctx.ddd = nil
+
         local args = {...}
-        local locals = {}
-        local i = 1
-        while true do
-            local name, value = debug.getlocal(2, i)
-            if not name then break end
-    
-            locals[name] = value
-            i = i + 1
-        end
-    
         local status, _error = pcall(function()
-            load(_filter, "@"..filtername, "t", setmetatable(locals, {__index = _G}))()(table.unpack(args))
+            load(_filter, "@"..filtername, "t", setmetatable(ctx, {__index = _G}))()(table.unpack(args), ddd and table.unpack(ddd))
         end)
 
         if not status then

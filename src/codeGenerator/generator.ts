@@ -21,6 +21,7 @@ class Code extends CodeManager {
 class CodeGenerator extends LuaListener {
     firstStat: boolean = true
     injecter: Injecter
+    currentFunctionParList: ParlistContext
     insideClass: string;
     insideTryCatch: boolean;
 
@@ -534,9 +535,12 @@ class CodeGenerator extends LuaListener {
         const savedInsideClass = this.insideClass;
         if (savedInsideClass) this.insideClass = null;
 
+        this.currentFunctionParList = ctx.parlist()
+
         code.add(ctx.block(), this.enterBlock)
         code.add(ctx.END())
 
+        this.currentFunctionParList = null
         if (savedInsideClass) this.insideClass = savedInsideClass;
 
         return code.get();
@@ -1076,7 +1080,7 @@ class CodeGenerator extends LuaListener {
             code.add(ctx.parlist(), this.enterParlist);
         }
 
-        code.add(") ");
+        code.add(", ...) ");
         code.add(this.enterFilterfieldlist(filterfieldlist));
 
         code.addSpaces(filterfield_list.at(-1), ctx.END());
@@ -1093,6 +1097,30 @@ class CodeGenerator extends LuaListener {
         code.add("_leap_internal_using_operator(\"")
         code.add(ctx.identifier(), this.enterIdentifier);
         code.add("\"")
+
+        code.add(",")
+        code.add("{");
+
+        // Self is always passed
+        code.add("self = self,");
+
+        // DDD is passed if exists
+        if (this.currentFunctionParList.DDD()) {
+            code.add("ddd = {...},")
+        }
+
+        // Pass all parameters
+        const parctx = this.currentFunctionParList.extendedparlist()
+        const extendedparlist = parctx.extendedpar_list();
+        
+        extendedparlist.forEach((extendedpar, i) => {
+            code.add(extendedpar.identifier(), this.enterIdentifier)
+            code.add(" = ")
+            code.add(extendedpar.identifier(), this.enterIdentifier)
+            code.add(",")
+        })
+
+        code.add("}")
         
         if (ctx.explist()) {
             code.add(",");
