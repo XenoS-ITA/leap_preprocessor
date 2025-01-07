@@ -1078,9 +1078,11 @@ class CodeGenerator extends LuaListener {
         
         if (ctx.parlist()) {
             code.add(ctx.parlist(), this.enterParlist);
+            code.add(", ...) ");
+        } else {
+            code.add("...) ");
         }
 
-        code.add(", ...) ");
         code.add(this.enterFilterfieldlist(filterfieldlist));
 
         code.addSpaces(filterfield_list.at(-1), ctx.END());
@@ -1112,7 +1114,7 @@ class CodeGenerator extends LuaListener {
         // Pass all parameters
         const parctx = this.currentFunctionParList.extendedparlist()
         const extendedparlist = parctx.extendedpar_list();
-        
+
         extendedparlist.forEach((extendedpar, i) => {
             code.add(extendedpar.identifier(), this.enterIdentifier)
             code.add(" = ")
