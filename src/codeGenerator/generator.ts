@@ -1116,10 +1116,12 @@ class CodeGenerator extends LuaListener {
         const extendedparlist = parctx.extendedpar_list();
 
         extendedparlist.forEach((extendedpar, i) => {
-            code.add(extendedpar.identifier(), this.enterIdentifier)
+            code.add(this.enterIdentifier(extendedpar.identifier()))
             code.add(" = ")
-            code.add(extendedpar.identifier(), this.enterIdentifier)
-            code.add(",")
+            code.add(this.enterIdentifier(extendedpar.identifier()))
+
+            if (i != extendedparlist.length-1)
+                code.add(",")
         })
 
         code.add("}")
@@ -1129,7 +1131,11 @@ class CodeGenerator extends LuaListener {
             code.add(ctx.explist(), this.enterExplist);
         }
 
-        code.add(")")
+        if (ctx.CP()) {
+            code.add(ctx.CP())
+        } else {
+            code.add(")")
+        }
 
         return code.get();
     }
