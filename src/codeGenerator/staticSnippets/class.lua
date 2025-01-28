@@ -9,7 +9,13 @@ if not _leap_internal_classBuilder then
     
         if baseClass.__prototype then
             prototype.super = setmetatable({__type = baseClass.__type, __prototype = baseClass.__prototype}, {
-                __index = baseClass.__prototype,
+                __index = function(_self, key)
+                    if baseClass.__prototype.super then
+                        return baseClass.__prototype[key] or baseClass.__prototype.super[key]
+                    else
+                        return baseClass.__prototype[key]
+                    end
+                end,
                 __call = baseClass,
                 __newindex = function(self, k) error("attempted to assign class property '"..k.."' directly, please instantiate the class before assigning any properties", 2) end,
             })
@@ -28,7 +34,7 @@ if not _leap_internal_classBuilder then
                 local obj = setmetatable({__type = self.__type}, {
                     __index = function(_self, key)
                         if self.__prototype.super then
-                            return self.__prototype[key] or self.__prototype.super.__prototype[key]
+                            return self.__prototype[key] or self.__prototype.super[key]
                         else
                             return self.__prototype[key]
                         end
