@@ -33,7 +33,7 @@ stat
     : ';'
     | varlist '=' explist
     | compound // cfxlua
-    | functioncall
+    | 'new'? functioncall
     | label
     | 'break'
     | 'goto' identifier
