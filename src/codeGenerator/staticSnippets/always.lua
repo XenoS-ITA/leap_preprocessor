@@ -7,7 +7,7 @@ if not leap then leap = {} end
 -- Function to deserialize objects (example: objects sended over the network)
 if not leap.deserialize then
     leap.deserialize = function(class)
-        if type(class) == "table" and class.__type then
+        if _type(class) == "table" and class.__type then
             local _class = _G[class.__type]
 
             if _class then
@@ -23,8 +23,14 @@ if not leap.deserialize then
             else
                 error("Class '"..class.__type.."' not found", 2)
             end
+        else
+            error("leap.deserialize: passed argument must be a table (serialized object), but got ".._type(class), 2)
         end
     end
+end
+
+if not leap.serialize then
+    leap.serialize = table.clone -- Table clone will do the job as it will perform a shallow-copy without metatable
 end
 
 -- Type override (allow custom types)
