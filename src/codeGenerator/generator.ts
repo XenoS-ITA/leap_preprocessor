@@ -1,5 +1,5 @@
 import { ParserRuleContext, TerminalNode } from 'antlr4';
-import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext, FilterfieldContext, FilterfieldlistContext } from '../grammar/LuaParser.js';
+import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext, FilterfieldContext, FilterfieldlistContext, ArgumentlistContext, ArgumentContext } from '../grammar/LuaParser.js';
 import LuaListener from '../grammar/LuaParserListener.js';
 import Utils from './utils.js';
 import CodeManager from './manager.js';
@@ -24,6 +24,7 @@ class CodeGenerator extends LuaListener {
     currentFunctionParList: ParlistContext
     insideClass: string;
     insideTryCatch: boolean;
+    kargsTable: { [key: number]: string };
 
     forDepth: number = 0
 
@@ -32,6 +33,7 @@ class CodeGenerator extends LuaListener {
     constructor() {
         super();
         this.injecter = new Injecter()
+        this.kargsTable = {}
     }
 
     convert = (tree: Start_Context) => {
@@ -488,7 +490,34 @@ class CodeGenerator extends LuaListener {
         code.add(ctx.exp(), this.enterExp);
 
         return code.get()
-    } 
+    }
+
+    //@ts-expect-error
+    enterArgument = (ctx: ArgumentContext, id: number): string => {
+        const code = new Code();
+        const identifier = ctx.identifier()
+        
+        if (identifier != null && ctx.exp()) {
+            this.injecter.enableGlobalFeature("kargs")
+            this.kargsTable[id] += `${this.enterIdentifier(identifier)} = ${this.enterExp(ctx.exp())},`
+            //console.log("adding kargs for id", id, "with value", this.kargsTable[id])
+
+            return `nil` // Skip this argument (but preserve identation and positional arguments!)
+        } else {
+            code.add(ctx.exp(), this.enterExp)
+        }
+
+        return code.get()
+    };
+
+    //@ts-expect-error
+    enterArgumentlist = (ctx: ArgumentlistContext, id: number): string => {
+        const func = (ctx: any) => {
+            return this.enterArgument(ctx, id)
+        }
+
+        return Utils.convertNodes(ctx.argument_list(), func);
+    }
 
     enterArgs = (ctx: ArgsContext): string => {
         if (ctx.string_()) {
@@ -497,11 +526,37 @@ class CodeGenerator extends LuaListener {
             return this.enterTableconstructor(ctx.tableconstructor());
         } else if (ctx.OP()) {
             const code = new Code();
+            const argslist = ctx.argumentlist()
+            code.add(ctx.OP())
 
-            code.add(ctx.OP());;
+            if (argslist) {
+                const id = argslist.start.start // We use the tokenIndex as id
+                this.kargsTable[id] = "" // Distinguish kargs for each args parsing to avoid mixing kargs of sub calls.
 
-            if (ctx.explist()) {
-                code.add(ctx.explist(), this.enterExplist);
+                const argslistconv = this.enterArgumentlist(argslist, id)
+                code.addSpaces(code.lastNode, argslist);
+
+                code.lastNode = argslist
+                
+                //console.log("kargs with id ", id, "is", this.kargsTable[id])
+                if (this.kargsTable[id].length > 0) {
+                    // Add call for kargs before arguments
+                    code.add("__leap_call_kargs({"+this.kargsTable[id]+"}")
+
+                    if (argslistconv.length > 0) {
+                        code.add(",")
+                    }
+                }
+
+                // Lets add the rest of the arguments
+                code.add(argslistconv);
+                
+                // Close kargs call
+                if (this.kargsTable[id].length > 0) {
+                    code.add(")");
+                }
+
+                delete this.kargsTable[id]
             }
 
             code.add(ctx.CP());
@@ -607,7 +662,6 @@ class CodeGenerator extends LuaListener {
 
     enterExtendedparlist = (ctx: ExtendedparlistContext): string => {
         const code = new Code();
-        let codeToInject: string = "";
 
         // cfxlua (class)
         if (this.insideClass) {
@@ -620,6 +674,14 @@ class CodeGenerator extends LuaListener {
             if (i > 0) code.add(",")
             code.add(extendedpar, this.enterExtendedpar)
         })
+
+        // Already convert parlist to strings
+        const parliststr = extendedparlist.map((v) => this.enterIdentifier(v.identifier()))
+
+        // kargs check should be in any function, 
+        // since we cant know which functions will be called with kargs 
+        // (this will add only an if of overhead on best cases)
+        this.injecter.inNext("enterFuncbody", CodeSnippets.kargsCheck(parliststr))
 
         return code.get();
     };
@@ -896,12 +958,16 @@ class CodeGenerator extends LuaListener {
 
         this.insideTryCatch = false;
 
-        code.add(`end) if not _leap_internal_status then local `);
-        code.add(ctx.identifier(), this.enterIdentifier);
-        code.add(` = _leap_internal_result;`);
+        code.add(`end) if not _leap_internal_status then `);
 
-            // Parse catch block
-            code.add(ctx.block(1), this.enterBlock);
+        if (ctx.identifier()) {
+            code.add("local ");
+            code.add(ctx.identifier(), this.enterIdentifier);
+            code.add(` = _leap_internal_result;`);
+        }
+
+        // Parse catch block
+        code.add(ctx.block(1), this.enterBlock);
 
         // Manually handle spaces since we discard the END token
         code.addSpaces(ctx.block(1), ctx.END());

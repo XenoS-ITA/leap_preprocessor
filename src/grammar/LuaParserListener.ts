@@ -28,6 +28,8 @@ import { VarContext } from "./LuaParser.js";
 import { PrefixexpContext } from "./LuaParser.js";
 import { FunctioncallContext } from "./LuaParser.js";
 import { CompoundContext } from "./LuaParser.js";
+import { ArgumentContext } from "./LuaParser.js";
+import { ArgumentlistContext } from "./LuaParser.js";
 import { ArgsContext } from "./LuaParser.js";
 import { FunctiondefContext } from "./LuaParser.js";
 import { FuncbodyContext } from "./LuaParser.js";
@@ -301,6 +303,26 @@ export default class LuaParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitCompound?: (ctx: CompoundContext) => void;
+	/**
+	 * Enter a parse tree produced by `LuaParser.argument`.
+	 * @param ctx the parse tree
+	 */
+	enterArgument?: (ctx: ArgumentContext) => void;
+	/**
+	 * Exit a parse tree produced by `LuaParser.argument`.
+	 * @param ctx the parse tree
+	 */
+	exitArgument?: (ctx: ArgumentContext) => void;
+	/**
+	 * Enter a parse tree produced by `LuaParser.argumentlist`.
+	 * @param ctx the parse tree
+	 */
+	enterArgumentlist?: (ctx: ArgumentlistContext) => void;
+	/**
+	 * Exit a parse tree produced by `LuaParser.argumentlist`.
+	 * @param ctx the parse tree
+	 */
+	exitArgumentlist?: (ctx: ArgumentlistContext) => void;
 	/**
 	 * Enter a parse tree produced by `LuaParser.args`.
 	 * @param ctx the parse tree

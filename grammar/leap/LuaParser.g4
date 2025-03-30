@@ -50,7 +50,7 @@ stat
     | 'local' attnamelist ('=' explist)?
     | 'local' attnamelist 'in' prefixexp // cfxlua
     | 'defer' block 'end' // cfxlua
-    | 'try' block 'catch' identifier 'then' block 'end'
+    | 'try' block 'catch' (identifier 'then'?)? block 'end'
     | 'throw' exp
     | class
     ;
@@ -178,8 +178,16 @@ compound
     : var ('+=' | '-=' | '*=' | '/=' | '<<=' | '>>=' | '&=' | '|=' | '^=' ) exp
     ;
 
+argument
+    : (identifier '=')? exp
+    ;
+
+argumentlist
+    : argument (',' argument)*
+    ;
+
 args
-    : '(' explist? ')'
+    : '(' argumentlist? ')'
     | tableconstructor
     | string
     ;

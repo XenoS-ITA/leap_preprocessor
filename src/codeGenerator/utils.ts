@@ -8,9 +8,12 @@ namespace Utils {
         let code = new Code();
 
         nodes.forEach((node, i) => {
-            code.add(node, enterRule)
-
-            if (i != nodes.length-1 && separator != null) code.add(separator)
+            if (i > 0 && separator != null) code.add(separator)
+            
+            // If we didnt do anything we need to remove the separator
+            if (!code.add(node, enterRule)) {
+                code.remove(separator.length)
+            }
         })
 
         return code.get();

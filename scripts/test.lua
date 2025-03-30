@@ -179,3 +179,13 @@ editMessage(user) -- HaveRightsTo:2: User dont have permission to editMessage! (
 
 user.permissions.editMessage = true
 editMessage(user) -- Message edited! (User role is admin and editMessage permission is true)
+
+-- Keyword arguments
+local sum = addNumbers(numA = 1, numB = 5)
+print(sum)
+
+local sum = addNumbers(numB = 5, numA = 1) -- Keyword arguments can be specified in any order
+print(sum)
+
+local sum = addNumbers(1, numB = 5) -- Keyword arguments can be mixed up with positional arguments (positional arguments will keep their position)
+print(sum)

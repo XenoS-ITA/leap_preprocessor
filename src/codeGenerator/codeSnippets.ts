@@ -3,6 +3,7 @@ import always from "./staticSnippets/always.lua";
 import classCode from "./staticSnippets/class.lua";
 import inOp from "./staticSnippets/in.lua";
 import usingOp from "./staticSnippets/using.lua";
+import callKargs from "./staticSnippets/kargs.lua"
 
 namespace CodeSnippets {
     export function typeCheck(partypelist: IdentifierContext[], param: IdentifierContext) {
@@ -64,6 +65,19 @@ namespace CodeSnippets {
         return codeToInject
     }
 
+    export function kargsCheck(parlist: string[]) {
+        let codeToInject: string = "";
+        codeToInject += "if __leap_KARGS then "
+
+        parlist.forEach((v: any) => {
+            codeToInject += `${v} = __leap_KARGS.${v} or ${v};`
+        })
+
+        codeToInject += "__leap_KARGS = nil end"
+
+        return codeToInject
+    }
+
     // Features
     export function alwaysInjected() {
         return always
@@ -79,6 +93,10 @@ namespace CodeSnippets {
 
     export function usingOperator() {
         return usingOp
+    }
+
+    export function kargs() {
+        return callKargs
     }
 }
 

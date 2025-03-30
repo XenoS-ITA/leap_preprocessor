@@ -24,7 +24,10 @@ class Code {
 
         // Convert node to string
         if (enterRule) {
-            codeToAdd += enterRule(code);
+            const ret = enterRule(code)
+            if (!ret) return // Skip empty return code
+
+            codeToAdd += ret;
         } else {
             if (Array.isArray(code)) {
                 code.forEach(node => {
@@ -58,6 +61,7 @@ class Code {
         }
 
         this.code += codeToAdd;
+        return true;
     }
 
     addSpaces(from: ParserNode, to: ParserNode) {

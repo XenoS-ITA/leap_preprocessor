@@ -23,6 +23,7 @@ Think of it as an effective "modernity" leap into the future to make lua a featu
   - [X] String Interpolation
   - [X] Filter 
   - [X] Using operator
+  - [X] Keyword arguments
 
 ## Leap v2 added features
   - [X] In operator

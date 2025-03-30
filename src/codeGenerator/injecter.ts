@@ -35,6 +35,10 @@ class Injecter {
         }
     }
 
+    isFeatureEnabled(name: string) {
+        return this.features.includes(name)
+    }
+
     enableGlobalFeature(name: string) {
         if (CodeSnippets[name]) {
             if (this.features.includes(name)) {
