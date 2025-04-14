@@ -33,6 +33,29 @@ if not leap.serialize then
     leap.serialize = table.clone -- Table clone will do the job as it will perform a shallow-copy without metatable
 end
 
+if not leap.fsignature then
+    leap.fsignature = function(func)
+        if _type(func) ~= "function" then
+            error("leap.fsignature: passed argument must be a function, but got ".._type(func), 2)
+        end
+        
+        if not __leap__introspection then return nil end
+        return __leap__introspection[func]
+    end
+end
+
+if not leap.registerfunc then
+    leap.registerfunc = function(func, metadata)
+        if not __leap__introspection then
+            __leap__introspection = {}
+        end
+
+        __leap__introspection[func] = metadata
+
+        return func
+    end
+end
+
 -- Type override (allow custom types)
 if not _type then
     _type = type -- we preserve the original "type" function

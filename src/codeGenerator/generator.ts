@@ -24,6 +24,11 @@ class CodeGenerator extends LuaListener {
     currentFunctionParList: ParlistContext
     insideClass: string;
     insideTryCatch: boolean;
+    
+    assignment: boolean;
+    functionsName: Array<string | Array<string>>;
+    
+    functionReturn: boolean;
     kargsTable: { [key: number]: string };
 
     forDepth: number = 0
@@ -34,6 +39,7 @@ class CodeGenerator extends LuaListener {
         super();
         this.injecter = new Injecter()
         this.kargsTable = {}
+        this.functionsName = []
     }
 
     convert = (tree: Start_Context) => {
@@ -59,6 +65,8 @@ class CodeGenerator extends LuaListener {
     enterBlock = (ctx: BlockContext): string => {
         let code = new Code(this);
 
+        const funcname = this.getFunctionName();
+
         ctx.stat_list().forEach(stat => {
             // If there'are some comments before the first statement preserve the lines
             if (this.firstStat) {
@@ -74,6 +82,9 @@ class CodeGenerator extends LuaListener {
         })
 
         if (ctx.retstat()) {
+            if (funcname && ctx.retstat().RETURN() && ctx.retstat().explist()) {
+                this.functionReturn = true
+            }
             code.add(ctx.retstat(), this.enterRetstat);
         }
 
@@ -84,11 +95,7 @@ class CodeGenerator extends LuaListener {
         if (ctx.SEMI()) {
             return ';';
         } else if (ctx.varlist()) {
-            const varlist = this.enterVarlist(ctx.varlist());
-            const eq = ctx.EQ().getText();
-            const explist = this.enterExplist(ctx.explist());
-
-            return `${varlist} ${eq} ${explist}`;
+            return this.convertAssignment(ctx);
         } else if (ctx.compound()) {
             return this.enterCompound(ctx.compound());
         } else if (ctx.functioncall()) {
@@ -260,7 +267,15 @@ class CodeGenerator extends LuaListener {
 
 
         } else if (ctx.functiondef()) {
-            return this.enterFunctiondef(ctx.functiondef());
+            if (this.assignment) {
+                return this.enterFunctiondef(ctx.functiondef());
+            } else {
+                const id = this.addFunctionName("", true)
+                const func = this.enterFunctiondef(ctx.functiondef());
+                this.removeFunctionName(id)
+                return func;
+            }
+            
         } else if (ctx.prefixexp()) {
             return this.enterPrefixexp(ctx.prefixexp());
 
@@ -474,8 +489,10 @@ class CodeGenerator extends LuaListener {
             const nameList = ctx.identifier_list()
             code.add(nameList[nameList.length-1])
         }
-        
+
+        const id = this.addFunctionName(code.get())
         code.add(ctx.args(), this.enterArgs)
+        this.removeFunctionName(id)
 
         return code.get()
     }
@@ -500,7 +517,6 @@ class CodeGenerator extends LuaListener {
         if (identifier != null && ctx.exp()) {
             this.injecter.enableGlobalFeature("kargs")
             this.kargsTable[id] += `${this.enterIdentifier(identifier)} = ${this.enterExp(ctx.exp())},`
-            //console.log("adding kargs for id", id, "with value", this.kargsTable[id])
 
             return `nil` // Skip this argument (but preserve identation and positional arguments!)
         } else {
@@ -541,7 +557,7 @@ class CodeGenerator extends LuaListener {
                 //console.log("kargs with id ", id, "is", this.kargsTable[id])
                 if (this.kargsTable[id].length > 0) {
                     // Add call for kargs before arguments
-                    code.add("__leap_call_kargs({"+this.kargsTable[id]+"}")
+                    code.add(`__leap_call_kargs(${this.getFunctionName(null, true)}, {${this.kargsTable[id]}}`)
 
                     if (argslistconv.length > 0) {
                         code.add(",")
@@ -567,9 +583,43 @@ class CodeGenerator extends LuaListener {
     
     enterFunctiondef = (ctx: FunctiondefContext): string => {
         const code = new Code();
+        const functionName = this.getFunctionName()
 
-        code.add(ctx.FUNCTION())
-        code.add(ctx.funcbody(), this.enterFuncbody);
+        if (!functionName) {
+            code.add(ctx.FUNCTION())
+            code.add(ctx.funcbody(), this.enterFuncbody);
+        } else {
+            let actualFuncname: string
+
+            if (typeof functionName == "string") {
+                actualFuncname = functionName
+            } else {
+                actualFuncname = functionName[functionName.length - 1]
+            }
+
+            const injectBody = (code) => {
+                code.add(ctx.funcbody(), this.enterFuncbody);
+
+                if (Array.isArray(functionName)) functionName.shift();
+            }
+
+            const injectArgs = (code) => {
+                this.injecter.injectIfNeeded(code, "enterFunctiondef");
+            }
+
+            const functionReturn = () => {
+                const ret = this.functionReturn
+
+                if (this.functionReturn) {
+                    this.functionReturn = false
+                }
+             
+                return ret
+            }
+
+            const introspection = CodeSnippets.functionIntrospection(actualFuncname, injectBody, injectArgs, functionReturn)
+            code.add(introspection)
+        }
 
         return code.get();
     }
@@ -676,12 +726,11 @@ class CodeGenerator extends LuaListener {
         })
 
         // Already convert parlist to strings
-        const parliststr = extendedparlist.map((v) => this.enterIdentifier(v.identifier()))
+        const parliststr = extendedparlist.map((v) => '{name = "'+this.enterIdentifier(v.identifier())+'"},')
 
-        // kargs check should be in any function, 
-        // since we cant know which functions will be called with kargs 
-        // (this will add only an if of overhead on best cases)
-        this.injecter.inNext("enterFuncbody", CodeSnippets.kargsCheck(parliststr))
+        /// Save the parlist in the function metatable
+        this.injecter.cleanInjects("enterFunctiondef")
+        this.injecter.inNext("enterFunctiondef", parliststr.join(""))
 
         return code.get();
     };
@@ -793,23 +842,42 @@ class CodeGenerator extends LuaListener {
 
             //this.injecter.inNext("enterClass", "end")
 
-
             code.add(ctx.functiondef(), this.enterFunctiondef);
 
         } else if (ctx.OB()) {
+            const isfunc = ctx.exp(1).functiondef()
+            let id = null
+
+            if (isfunc) id = this.addFunctionName(this.enterExp(ctx.exp(0)))
+
             code.add(ctx.OB())
             code.add(ctx.exp(0), this.enterExp);
             code.add(ctx.CB())
 
+            this.assignment = true
             code.add(ctx.EQ())
             code.add(ctx.exp(1), this.enterExp);
+            this.assignment = false
+
+            if (isfunc) this.removeFunctionName(id)
+        
         } else if (ctx.DOT()) { // cfxlua (setconstructor)
             code.add(ctx.DOT())
             code.add(ctx.identifier())
         } else if (ctx.identifier()) {
+            const isfunc = ctx.exp(0).functiondef()
+            let id = null
+
+            if (isfunc) id = this.addFunctionName(this.enterIdentifier(ctx.identifier()))
+
             code.add(ctx.identifier())
+
+            this.assignment = true
             code.add(ctx.EQ())
             code.add(ctx.exp(0), this.enterExp);
+            this.assignment = false
+
+            if (isfunc) this.removeFunctionName(id)
         } else {
             code.add(ctx.exp(0), this.enterExp);
         }
@@ -1121,10 +1189,34 @@ class CodeGenerator extends LuaListener {
         const name = this.enterFuncname(ctx.funcname());
 
         this.convertDecoratorList(decorList, code, name, "convertFunction");
+        
+        if (ctx.funcname().COL()) {
+            this.insideClass = "true" // Inject self in the function parameters
+            
+            // Replace colons with dots
+            code.add(ctx.funcname(), (node: any) => {
+                return this.enterFuncname(node).replace(":", ".")
+            });
 
-        code.add(ctx.FUNCTION());
-        code.add(ctx.funcname(), this.enterFuncname);
-        code.add(ctx.funcbody(), this.enterFuncbody);
+            code.add(" = ")
+        } else {
+            code.add(ctx.funcname(), this.enterFuncname);
+            code.add(" = ")
+        }
+
+        // Use only last identifier as function name
+        const nameList = ctx.funcname().identifier_list()
+        const funcname = this.enterIdentifier(nameList[nameList.length-1]);
+
+        const id = this.addFunctionName(funcname)
+        code.add(this.enterFunctiondef(ctx));
+        this.removeFunctionName(id)
+
+        // If we where in the "true" class, reset it 
+        if (this.insideClass == "true") {
+            this.insideClass = null
+        }
+
 
         this.injecter.injectIfNeeded(code);
 
@@ -1210,15 +1302,23 @@ class CodeGenerator extends LuaListener {
         const code = new Code();
 
         code.add(ctx.LOCAL());
-        code.add(ctx.FUNCTION());
-        code.add(ctx.identifier());
-        code.add(ctx.funcbody(), this.enterFuncbody);
+        code.add(ctx.identifier(), this.enterIdentifier);
+        code.add(" = ");
+        
+        const id = this.addFunctionName(this.enterIdentifier(ctx.identifier()))
+        code.add(this.enterFunctiondef(ctx));
+        this.removeFunctionName(id)
 
         return code.get();
     }
 
     convertLocal = (ctx: StatContext): string => {
         const code = new Code();
+
+        // Save functions names in an array (every function will shift() is name)
+        const funcs = ctx.explist().exp_list()
+        const identifiers = ctx.attnamelist().identifier_list()
+        const id = this.addFunctionName(this.getFunctionNames(funcs, identifiers))
 
         code.add(ctx.LOCAL());
         code.add(ctx.attnamelist(), this.enterAttnamelist);
@@ -1228,8 +1328,13 @@ class CodeGenerator extends LuaListener {
             code.add(ctx.prefixexp(), this.enterPrefixexp);
         } else if (ctx.EQ()) {
             code.add(ctx.EQ());
+
+            this.assignment = true
             code.add(ctx.explist(), this.enterExplist);
+            this.assignment = false
         }
+
+        this.removeFunctionName(id)
 
         return code.get();
     }
@@ -1240,7 +1345,87 @@ class CodeGenerator extends LuaListener {
 
         return `goto continue_${this.forDepth}`;
     }
+
+    convertAssignment = (ctx: StatContext): string => {
+        const funcs = ctx.explist().exp_list()
+        const identifiers = ctx.varlist().var__list()
+
+        const id = this.addFunctionName(this.getFunctionNames(funcs, identifiers))
+
+        const varlist = this.enterVarlist(ctx.varlist());
+        const eq = ctx.EQ().getText();
+
+        this.assignment = true
+        const explist = this.enterExplist(ctx.explist());
+        this.assignment = false
+
+        this.removeFunctionName(id)
+
+        return `${varlist} ${eq} ${explist}`;
+    }
     //#endregion
+
+    getFunctionNames = (funcs: ExpContext[], identifiers: IdentifierContext[] | VarContext[]) => {
+        let functionNames = [];
+
+        for (const [i, func] of Object.entries(funcs)) {
+            const identifier = identifiers[i]
+
+            if (func.functiondef() && identifier) {
+                const member = identifier.indexed_member && identifier.indexed_member()
+                let funcname: string;
+
+                if (identifier instanceof IdentifierContext) {
+                    funcname = this.enterIdentifier(identifier)
+                } else if (identifier instanceof VarContext) {
+
+                    if (member) { // Capture only the actual function name
+                        if (member.identifier()) {
+                            funcname = this.enterIdentifier(member.identifier())
+                        } else {
+                            funcname = this.enterExp(member.exp())
+                        }
+                    } else {
+                        funcname = this.enterIdentifier(identifier.identifier())
+                    }
+                }
+
+                if (!member?.exp()) {
+                    funcname = '"'+funcname+'"'
+                }
+
+                functionNames.push(funcname)
+            }
+        }
+
+        return functionNames
+    }
+
+    addFunctionName = (funcName: string | Array<string>, raw: boolean = false): number => {
+        funcName = (raw || Array.isArray(funcName)) ? funcName : '"'+funcName+'"'
+
+        return this.functionsName.push(funcName)-1
+    }
+
+    removeFunctionName = (index?: number) => {
+        this.functionsName.splice(index || this.functionsName.length-1, 1)
+    }
+
+    getFunctionName = (index?: number, raw: boolean = false) => {
+        const funcname = this.functionsName[index || this.functionsName.length-1]
+
+        if (funcname?.length > 0) {
+            if (raw) {
+                if (typeof funcname === "string") {
+                    return funcname.replace(/"/g, "")
+                } else {
+                    throw new Error("getFunctioName: raw is set to true, but the function name is not a string")
+                }
+            }
+
+            return funcname
+        }
+    }
 }
 
 export { CodeGenerator }

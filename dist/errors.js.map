@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/errors.ts"],
+  "sourcesContent": ["import { LeapSyntaxError } from \"./errorListener\";\n\nclass LeapSyntaxErrors extends Error {\n    errors: LeapSyntaxError[]\n\n    constructor(errors: LeapSyntaxError[]) {\n        super();\n\n        this.errors = errors\n    }\n}\n\nexport { LeapSyntaxErrors };"],
+  "mappings": "4ZAAA,IAAAA,EAAA,GAAAC,EAAAD,EAAA,sBAAAE,IAAA,eAAAC,EAAAH,GAEA,IAAME,EAAN,cAA+B,KAAM,CAGjC,YAAYE,EAA2B,CACnC,MAAM,EAEN,KAAK,OAASA,CAClB,CACJ",
+  "names": ["errors_exports", "__export", "LeapSyntaxErrors", "__toCommonJS", "errors"]
+}

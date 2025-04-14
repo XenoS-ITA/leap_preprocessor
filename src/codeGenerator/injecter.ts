@@ -18,6 +18,10 @@ class Injecter {
         this.injects.push({ func, code })
     }
 
+    cleanInjects(func: string) {
+        this.injects = this.injects.filter(inject => inject.func !== func)        
+    }
+
     // Inject the "code" in the code manager
     injectIfNeeded(code: Code, funcname?: string) {
         funcname = funcname || Utils.getCallerName(2);

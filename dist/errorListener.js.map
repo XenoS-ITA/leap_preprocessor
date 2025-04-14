@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/errorListener.ts"],
+  "sourcesContent": ["import { CommonToken, ErrorListener } from 'antlr4';\n\ntype LeapSyntaxError = { line: number; column: number; message: string; offendingSymbol: any };\n\nclass ExtendedErrorListener extends ErrorListener<CommonToken> {\n    errors: Array<LeapSyntaxError>;\n\n    constructor() {\n        super();\n        this.errors = [];\n    }\n\n    syntaxError(recognizer: any, offendingSymbol: CommonToken, line: number, column: number, msg: string, e: any) {\n        const error = {\n            line,\n            column,\n            message: msg,\n            offendingSymbol,\n        };\n\n        this.errors.push(error);\n    }\n\n    getErrors() {\n        return this.errors;\n    }\n}\n\nexport { LeapSyntaxError, ExtendedErrorListener };"],
+  "mappings": "4ZAAA,IAAAA,EAAA,GAAAC,EAAAD,EAAA,2BAAAE,IAAA,eAAAC,EAAAH,GAAA,IAAAI,EAA2C,kBAIrCF,EAAN,cAAoC,eAA2B,CAG3D,aAAc,CACV,MAAM,EACN,KAAK,OAAS,CAAC,CACnB,CAEA,YAAYG,EAAiBC,EAA8BC,EAAcC,EAAgBC,EAAaC,EAAQ,CAC1G,IAAMC,EAAQ,CACV,KAAAJ,EACA,OAAAC,EACA,QAASC,EACT,gBAAAH,CACJ,EAEA,KAAK,OAAO,KAAKK,CAAK,CAC1B,CAEA,WAAY,CACR,OAAO,KAAK,MAChB,CACJ",
+  "names": ["errorListener_exports", "__export", "ExtendedErrorListener", "__toCommonJS", "import_antlr4", "recognizer", "offendingSymbol", "line", "column", "msg", "e", "error"]
+}

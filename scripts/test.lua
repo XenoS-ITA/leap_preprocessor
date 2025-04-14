@@ -31,8 +31,7 @@ class Dragster extends Car {
     brand = "Example Dragster",
 
     constructor = function()
-        -- Still doesnt works as expected!
-        self.super(200)
+        self:super(200)
     end
 }
 
@@ -41,7 +40,7 @@ class MyError extends Error {
         self.message = message .. "Test"
     end,
 
-    toString = function(self)
+    toString = function()
         return "Custom error message "
     end
 }
@@ -57,7 +56,9 @@ function stopwatch(func)
     return function(...)
         local time = os.clock() * 1000
         local data = func(...)
-        print(func.name .. " taken "..((os.clock() * 1000) - time).."ms to execute")
+        local name = leap.fsignature(func)?.name
+
+        print(name .. " taken "..((os.clock() * 1000) - time).."ms to execute")
         return data
     end
 end

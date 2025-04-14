@@ -4,6 +4,7 @@ import classCode from "./staticSnippets/class.lua";
 import inOp from "./staticSnippets/in.lua";
 import usingOp from "./staticSnippets/using.lua";
 import callKargs from "./staticSnippets/kargs.lua"
+import Code from "./manager";
 
 namespace CodeSnippets {
     export function typeCheck(partypelist: IdentifierContext[], param: IdentifierContext) {
@@ -67,17 +68,26 @@ namespace CodeSnippets {
         return codeToInject
     }
 
-    export function kargsCheck(parlist: string[]) {
-        let codeToInject: string = "";
-        codeToInject += "if __leap_KARGS then "
+    export function functionIntrospection(functionName: string, injectBody, injectArgs, functionReturn) {
+        let code = new Code();
 
-        parlist.forEach((v: any) => {
-            codeToInject += `${v} = __leap_KARGS.${v} or ${v};`
-        })
+        code.add("leap.registerfunc(function")
+            injectBody(code)
+            code.add(", {")
+            code.add("args={")
+                injectArgs(code)
+            code.add("},")
 
-        codeToInject += "__leap_KARGS = nil end"
+            if (functionName && functionName.length > 0) {
+                code.add(`name=${functionName},`)
+            }
 
-        return codeToInject
+            if (functionReturn()) {
+                code.add("has_return=true,")
+            }
+        code.add("})")
+
+        return code.get()
     }
 
     // Features

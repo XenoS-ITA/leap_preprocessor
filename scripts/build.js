@@ -26,7 +26,7 @@ build({
     entryPoints: ["src/*.ts"],
     bundle: true,
     minify: true,
-    sourcemap: false,
+    sourcemap: true,
     external: Object.keys(dependencies),
     plugins: [luaLoaderPlugin],
     platform: 'node',
