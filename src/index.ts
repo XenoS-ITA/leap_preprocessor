@@ -42,7 +42,7 @@ function preprocessCode(code: string): string {
         const gen = new CodeGenerator();
         codePreprocessed = gen.convert(tree);
     } catch (e) {
-        throw Error("Internal error: " + e.message);
+        throw Error("Internal error: " + e.stack);
     }
 
     return codePreprocessed;
