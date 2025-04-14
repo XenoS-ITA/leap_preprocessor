@@ -16,7 +16,13 @@ if not _leap_internal_classBuilder then
                         return baseClass.__prototype[key]
                     end
                 end,
-                __call = baseClass,
+                __call = function(_self, ...) 
+                    if not baseClass.__prototype.constructor then
+                        return
+                    end
+
+                    return baseClass.__prototype.constructor(...)
+                end,
                 __newindex = function(self, k) error("attempted to assign class property '"..k.."' directly, please instantiate the class before assigning any properties", 2) end,
             })
         end
@@ -55,20 +61,7 @@ if not _leap_internal_classBuilder then
                 
                 if next(obj._leap_internal_decorators) then
                     for _, decorator in pairs(obj._leap_internal_decorators) do
-                        local decoratorMetatable = setmetatable(
-                            {
-                                name = decorator.name, 
-                                og = obj[decorator.name]
-                            }, 
-                            {
-                                __index = obj[decorator.name], 
-                                __call = function(__, ...) 
-                                    return __.og(obj,...) 
-                                end
-                            }
-                        )
-
-                        local retval = _G[decorator.decoratorName](obj, decoratorMetatable, table.unpack(decorator.args))
+                        local retval = _G[decorator.decoratorName](obj, _G[decorator.decoratorName], table.unpack(decorator.args))
 
                         obj[decorator.name] = (retval and retval.og) or obj[decorator.name];
                     end
