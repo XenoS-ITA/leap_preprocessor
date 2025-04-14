@@ -49,10 +49,12 @@ namespace CodeSnippets {
     export function decorator(funcName: string, decoratorName: string, decBody?: string) {
         let codeToInject: string = "";
 
-        codeToInject += `;${funcName} = ${decoratorName}(${decoratorMetatable(funcName)}`
-        if (decBody) { codeToInject += `, ${decBody}` }
+        codeToInject += `;${funcName} = ${decoratorName}(${funcName}`
+
+        if (decBody) codeToInject += `, ${decBody}`
+
         codeToInject += `)`
-        codeToInject += `?.og or ${funcName};` // Preserve function without metatable garbage (fallback to original function)
+        codeToInject += ` or ${funcName};` // Preserve function without metatable garbage (fallback to original function)
 
         return codeToInject
     }
