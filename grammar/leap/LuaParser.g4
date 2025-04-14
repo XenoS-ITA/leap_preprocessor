@@ -1,10 +1,7 @@
 /*
 
-MIT license
-
-Author: Ken Domino, October 2023
-
-Based on previous work of: Kazunori Sakamoto, Alexander Alexeev
+Author: XenoS.exe
+Based on previous work of: Kazunori Sakamoto, Alexander Alexeev, Ken Domino
 
 */
 
