@@ -35,18 +35,6 @@ namespace CodeSnippets {
         return codeToInject
     }
 
-    function decoratorMetatable(funcName: string, self?: boolean) {
-        let codeToInject: string = "";
-
-        codeToInject += `setmetatable(`
-            codeToInject += `{name = "${funcName}", og = ${self ? "self." : ""}${funcName}}`
-            codeToInject += `, `
-            codeToInject += `{__index = ${self ? "self." : ""}${funcName}, __call = function(__, ...) return __.og(${self ? "self," : ""}...) end}`
-        codeToInject += ")"
-
-        return codeToInject
-    }
-
     export function decorator(funcName: string, decoratorName: string, decBody?: string) {
         let codeToInject: string = "";
 
