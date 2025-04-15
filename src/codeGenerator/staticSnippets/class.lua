@@ -61,9 +61,10 @@ if not _leap_internal_classBuilder then
                 
                 if next(obj._leap_internal_decorators) then
                     for _, decorator in pairs(obj._leap_internal_decorators) do
-                        local retval = _G[decorator.decoratorName](obj, _G[decorator.decoratorName], table.unpack(decorator.args))
+                        local wrapper = function(...) obj[decorator.name](obj, ...) end
+                        local retval = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args))
 
-                        obj[decorator.name] = (retval and retval.og) or obj[decorator.name];
+                        obj[decorator.name] = retval or obj[decorator.name];
                     end
                 end
                 
