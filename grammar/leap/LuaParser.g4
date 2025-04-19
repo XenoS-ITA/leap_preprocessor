@@ -201,8 +201,13 @@ class
     : decorator* 'class' identifier ('extends' identifier)? tableconstructor
     ;
 
+type
+    : identifier
+    | 'nil'
+    ;
+
 partype
-    : (':' identifier ('|' identifier)*)?
+    : (':' type ('|' type)*)?
     ;
 
 defaultvalue

@@ -1,5 +1,5 @@
 import { ParserRuleContext, TerminalNode } from 'antlr4';
-import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext, FilterfieldContext, FilterfieldlistContext, ArgumentlistContext, ArgumentContext } from '../grammar/LuaParser.js';
+import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext, FilterfieldContext, FilterfieldlistContext, ArgumentlistContext, ArgumentContext, TypeContext } from '../grammar/LuaParser.js';
 import LuaListener from '../grammar/LuaParserListener.js';
 import Utils from './utils.js';
 import CodeManager from './manager.js';
@@ -686,21 +686,31 @@ class CodeGenerator extends LuaListener {
         return code.get();
     };
 
+    enterType = (ctx: TypeContext): string => {
+        if (ctx.identifier()) {
+            return this.enterIdentifier(ctx.identifier());
+        } else if (ctx.NIL()) {
+            return ctx.NIL().getText();
+        }
+    }
+
     enterExtendedpar = (ctx: ExtendedparContext) => {
         const code = new Code();
         let codeToInject: string = "";
 
         code.add(ctx.identifier(), this.enterIdentifier)
         const pctx = ctx.partype() as PartypeContext;
-        const partypelist = pctx.identifier_list();
+        const typelist = pctx.type__list();
 
         // Default value before type checking
         if (ctx.defaultvalue().getChildCount() > 0) {
             codeToInject += CodeSnippets.defaultValue(ctx.identifier(), this.enterDefaultvalue(ctx.defaultvalue()))
         }
 
-        if (partypelist.length > 0) {
-            codeToInject += CodeSnippets.typeCheck(partypelist, ctx.identifier())
+        if (typelist.length > 0) {
+            const typeliststr = typelist.map((v) => this.enterType(v))
+
+            codeToInject += CodeSnippets.typeCheck(typeliststr, ctx.identifier())
         }
 
         if (codeToInject != "") {

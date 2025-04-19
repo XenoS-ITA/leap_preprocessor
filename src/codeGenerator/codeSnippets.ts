@@ -7,7 +7,7 @@ import callKargs from "./staticSnippets/kargs.lua"
 import Code from "./manager";
 
 namespace CodeSnippets {
-    export function typeCheck(partypelist: IdentifierContext[], param: IdentifierContext) {
+    export function typeCheck(partypelist: string[], param: IdentifierContext) {
         let codeToInject: string = "";
         codeToInject += `if `
 
@@ -16,10 +16,10 @@ namespace CodeSnippets {
         partypelist.forEach((type, i) => {
             if (i > 0) codeToInject += ` and `
 
-            codeToInject += `type(${paramText}) ~= "${type.getText()}"`
+            codeToInject += `type(${paramText}) ~= "${type}"`
         })
 
-        const typesText = partypelist.map(type => type.getText()).join(" | ")
+        const typesText = partypelist.map(type => type).join(" | ")
         codeToInject += ` then error('${paramText}: must be (${typesText}) but got '..type(${paramText}), 2) end;`
 
         return codeToInject
