@@ -1326,9 +1326,9 @@ class CodeGenerator extends LuaListener {
         const code = new Code();
 
         // Save functions names in an array (every function will shift() is name)
-        const funcs = ctx.explist().exp_list()
+        const funcs = ctx.explist()?.exp_list()
         const identifiers = ctx.attnamelist().identifier_list()
-        const id = this.addFunctionName(this.getFunctionNames(funcs, identifiers))
+        const id = funcs ? this.addFunctionName(this.getFunctionNames(funcs, identifiers)) : null
 
         code.add(ctx.LOCAL());
         code.add(ctx.attnamelist(), this.enterAttnamelist);
@@ -1344,7 +1344,9 @@ class CodeGenerator extends LuaListener {
             this.assignment = false
         }
 
-        this.removeFunctionName(id)
+        if (id) {
+            this.removeFunctionName(id)
+        }
 
         return code.get();
     }
