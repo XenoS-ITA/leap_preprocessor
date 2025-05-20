@@ -37,8 +37,12 @@ if not leap.serialize then
     leap.serialize = function(obj)
         if obj.serialize then
             local data = obj:serialize()
-            data.__type = obj.__type -- Preserve class type
 
+            if not data then
+                return nil
+            end
+
+            data.__type = obj.__type -- Preserve class type
             return data
         else
             return table.clone(obj) -- Table clone will do the job as it will perform a shallow-copy without metatable
