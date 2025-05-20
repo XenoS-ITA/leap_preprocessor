@@ -6,22 +6,26 @@ if not leap then leap = {} end
 
 -- Function to deserialize objects (example: objects sended over the network)
 if not leap.deserialize then
-    leap.deserialize = function(class)
-        if _type(class) == "table" and class.__type then
-            local _class = _G[class.__type]
+    leap.deserialize = function(data)
+        if _type(data) == "table" and data.__type then
+            local _class = _G[data.__type]
 
             if _class then
                 _class.__skipNextConstructor = true -- Skip next constructor call
                 local obj = _class()
 
-                -- Copy all properties to the new instantiated object
-                for k, v in pairs(class) do
-                    obj[k] = v
+                if obj.deserialize then
+                    obj:deserialize(data)
+                else
+                    -- Copy all properties to the new instantiated object
+                    for k, v in pairs(data) do
+                        obj[k] = v
+                    end
                 end
 
                 return obj
             else
-                error("Class '"..class.__type.."' not found", 2)
+                error("Class '"..data.__type.."' not found", 2)
             end
         else
             error("leap.deserialize: passed argument must be a table (serialized object), but got ".._type(class), 2)
@@ -30,7 +34,16 @@ if not leap.deserialize then
 end
 
 if not leap.serialize then
-    leap.serialize = table.clone -- Table clone will do the job as it will perform a shallow-copy without metatable
+    leap.serialize = function(obj)
+        if obj.serialize then
+            local data = obj:serialize()
+            data.__type = obj.__type -- Preserve class type
+
+            return data
+        else
+            return table.clone(obj) -- Table clone will do the job as it will perform a shallow-copy without metatable
+        end
+    end
 end
 
 if not leap.fsignature then
