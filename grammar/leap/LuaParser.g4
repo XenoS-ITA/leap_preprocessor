@@ -118,6 +118,7 @@ exp
     | exp ('<' | '>' | '<=' | '>=' | '~=' | '!=' | '==') exp
     | exp ('and' | 'or') exp
     | exp ('&' | '|' | '~' | '<<' | '>>') exp
+    | isop
     | exp 'in' exp
     | exp 'not' 'in' exp
     | exp '?' exp ':' exp
@@ -201,6 +202,10 @@ class
     : decorator* 'class' identifier ('extends' identifier)? tableconstructor
     ;
 
+isop
+    : var 'is' var
+    ;
+
 type
     : identifier
     | 'nil'
@@ -266,6 +271,7 @@ identifier
     | TRY
     | CATCH
     | DEFER
+    | IS
     ;
 
 number

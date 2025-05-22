@@ -1,5 +1,5 @@
 import { ParserRuleContext, TerminalNode } from 'antlr4';
-import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext, FilterfieldContext, FilterfieldlistContext, ArgumentlistContext, ArgumentContext, TypeContext } from '../grammar/LuaParser.js';
+import { CompactfuncContext, ArgsContext, AttnamelistContext, AttribContext, BlockContext, ChunkContext, ClassContext, CompoundContext, DecoratorbodyContext, DecoratorContext, DefaultvalueContext, ExpContext, ExplistContext, ExtendedparContext, ExtendedparlistContext, FieldContext, FieldlistContext, FieldsepContext, FuncbodyContext, FuncnameContext, FunctioncallContext, FunctiondefContext, IdentifierContext, Indexed_memberContext, LabelContext, NamelistContext, NewcallContext, NumberContext, ParlistContext, PartypeContext, PrefixexpContext, RetstatContext, Start_Context, StatContext, StringContext, TablecomprehensionContext, TableconstructorContext, VarContext, VarlistContext, FilterfieldContext, FilterfieldlistContext, ArgumentlistContext, ArgumentContext, TypeContext, IsopContext } from '../grammar/LuaParser.js';
 import LuaListener from '../grammar/LuaParserListener.js';
 import Utils from './utils.js';
 import CodeManager from './manager.js';
@@ -264,7 +264,8 @@ class CodeGenerator extends LuaListener {
             return this.enterNewcall(ctx.newcall());
         } else if (ctx.QUESTMARK()) {
             return this.convertTernary(ctx);
-
+        } else if (ctx.isop()) {
+            return this.enterIsop(ctx.isop());
 
         } else if (ctx.functiondef()) {
             if (this.assignment) {
@@ -685,6 +686,18 @@ class CodeGenerator extends LuaListener {
 
         return code.get();
     };
+
+    enterIsop = (ctx: IsopContext): string => {
+        const code = new Code();
+
+        code.add("_leap_internal_is_operator(")
+        code.add(ctx.var_(0), this.enterVar);
+        code.add(",")
+        code.add(ctx.var_(1), this.enterVar);
+        code.add(")")
+
+        return code.get();
+    }
 
     enterType = (ctx: TypeContext): string => {
         if (ctx.identifier()) {

@@ -6,6 +6,17 @@ import usingOp from "./staticSnippets/using.lua";
 import callKargs from "./staticSnippets/kargs.lua"
 import Code from "./manager";
 
+const luaTypes = {
+    string: true,
+    number: true,
+    boolean: true,
+    table: true,
+    function: true,
+    userdata: true,
+    thread: true,
+    nil: true
+}
+
 namespace CodeSnippets {
     export function typeCheck(partypelist: string[], param: IdentifierContext) {
         let codeToInject: string = "";
@@ -13,16 +24,29 @@ namespace CodeSnippets {
 
         const paramText = param.getText()
 
-        partypelist.forEach((type, i) => {
-            if (i > 0) codeToInject += ` and `
-
-            codeToInject += `type(${paramText}) ~= "${type}"`
-        })
-
-        const typesText = partypelist.map(type => type).join(" | ")
-        codeToInject += ` then error('${paramText}: must be (${typesText}) but got '..type(${paramText}), 2) end;`
-
-        return codeToInject
+        if (luaTypes[partypelist[0]]) {
+            partypelist.forEach((type, i) => {
+                if (i > 0) codeToInject += ` and `
+    
+                codeToInject += `type(${paramText}) ~= "${type}"`
+            })
+    
+            const typesText = partypelist.map(type => type).join(" | ")
+            codeToInject += ` then error('${paramText}: must be (${typesText}) but got '..type(${paramText}), 2) end;`
+    
+            return codeToInject
+        } else {
+            codeToInject += `_type(${paramText}) ~= "table" `
+            
+            partypelist.forEach((type, i) => {
+                codeToInject += ` and not _leap_internal_is_operator(${paramText}, ${type})`
+            })
+    
+            const typesText = partypelist.map(type => type).join(" | ")
+            codeToInject += ` then error('${paramText}: must be (${typesText}) or a derived class but got '..type(${paramText}), 2) end;`
+    
+            return codeToInject
+        }
     }
 
     export function defaultValue(param: IdentifierContext, defaultConverted: string) {

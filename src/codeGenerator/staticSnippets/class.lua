@@ -93,3 +93,18 @@ if not _leap_internal_classBuilder then
         end
     }, {})
 end
+
+if not _leap_internal_is_operator then
+    _leap_internal_is_operator = function(obj, class)
+        local _obj = obj
+        while _obj and _obj.__type ~= class.__type do
+            if _obj.super then
+                _obj = _obj.super
+            else
+                return false
+            end
+        end
+
+        return true
+    end
+end

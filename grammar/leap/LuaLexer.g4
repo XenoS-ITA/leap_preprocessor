@@ -18,6 +18,7 @@ CLASS     : 'class';
 EXTENDS   : 'extends';
 USING     : 'using';
 FILTER    : 'filter';
+IS        : 'is';
 
 TRY       : 'try';
 CATCH     : 'catch';

@@ -190,3 +190,7 @@ print(sum)
 
 local sum = addNumbers(1, numB = 5) -- Keyword arguments can be mixed up with positional arguments (positional arguments will keep their position)
 print(sum)
+
+if not MyError is Error then
+    print("MyError is derived from Error")
+end

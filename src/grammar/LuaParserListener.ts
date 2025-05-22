@@ -34,6 +34,7 @@ import { ArgsContext } from "./LuaParser.js";
 import { FunctiondefContext } from "./LuaParser.js";
 import { FuncbodyContext } from "./LuaParser.js";
 import { ClassContext } from "./LuaParser.js";
+import { IsopContext } from "./LuaParser.js";
 import { TypeContext } from "./LuaParser.js";
 import { PartypeContext } from "./LuaParser.js";
 import { DefaultvalueContext } from "./LuaParser.js";
@@ -364,6 +365,16 @@ export default class LuaParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitClass?: (ctx: ClassContext) => void;
+	/**
+	 * Enter a parse tree produced by `LuaParser.isop`.
+	 * @param ctx the parse tree
+	 */
+	enterIsop?: (ctx: IsopContext) => void;
+	/**
+	 * Exit a parse tree produced by `LuaParser.isop`.
+	 * @param ctx the parse tree
+	 */
+	exitIsop?: (ctx: IsopContext) => void;
 	/**
 	 * Enter a parse tree produced by `LuaParser.type`.
 	 * @param ctx the parse tree
