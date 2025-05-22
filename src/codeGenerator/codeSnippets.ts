@@ -14,39 +14,34 @@ const luaTypes = {
     function: true,
     userdata: true,
     thread: true,
-    nil: true
+    nil: true,
+    vector2: true,
+    vector3: true,
+    vector4: true,
+    quat: true
 }
 
 namespace CodeSnippets {
-    export function typeCheck(partypelist: string[], param: IdentifierContext) {
-        let codeToInject: string = "";
-        codeToInject += `if `
+    export function typeCheck(partypeList: string[], param: IdentifierContext): string {
+        const paramText = param.getText();
+        const expectedTypes = partypeList.join(" | ");
+        const isOnlyLuaTypes = partypeList.every((type) => luaTypes[type]);
 
-        const paramText = param.getText()
+        const conditions = partypeList.map((type) => {
+            return luaTypes[type]
+                ? `type(${paramText}) ~= "${type}"`
+                : `not _leap_internal_is_operator(${paramText}, ${type})`;
+        });
 
-        if (luaTypes[partypelist[0]]) {
-            partypelist.forEach((type, i) => {
-                if (i > 0) codeToInject += ` and `
-    
-                codeToInject += `type(${paramText}) ~= "${type}"`
-            })
-    
-            const typesText = partypelist.map(type => type).join(" | ")
-            codeToInject += ` then error('${paramText}: must be (${typesText}) but got '..type(${paramText}), 2) end;`
-    
-            return codeToInject
-        } else {
-            codeToInject += `_type(${paramText}) ~= "table" `
-            
-            partypelist.forEach((type, i) => {
-                codeToInject += ` and not _leap_internal_is_operator(${paramText}, ${type})`
-            })
-    
-            const typesText = partypelist.map(type => type).join(" | ")
-            codeToInject += ` then error('${paramText}: must be (${typesText}) or a derived class but got '..type(${paramText}), 2) end;`
-    
-            return codeToInject
-        }
+        let condition = isOnlyLuaTypes
+            ? conditions.join(" and ")
+            : `_type(${paramText}) ~= "table" and ${conditions.join(" and ")}`;
+
+        const errorMsg = isOnlyLuaTypes
+            ? `${paramText}: must be (${expectedTypes}) but got '..type(${paramText})..'`
+            : `${paramText}: must be (${expectedTypes}) or a derived class but got '..type(${paramText})..'`;
+
+        return `if ${condition} then error('${errorMsg}', 2) end;`;
     }
 
     export function defaultValue(param: IdentifierContext, defaultConverted: string) {

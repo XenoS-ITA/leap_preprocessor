@@ -95,9 +95,21 @@ if not _leap_internal_classBuilder then
 end
 
 if not _leap_internal_is_operator then
-    _leap_internal_is_operator = function(obj, class)
+    _leap_internal_is_operator = function(obj, _class)
+        if not obj or not _class then
+            return false
+        end
+
+        if _type(obj) ~= "table" then
+            error("leap.is_operator: #1 passed argument must be a class instance, but got ".._type(obj), 2)
+        end
+
+        if _type(_class) ~= "table" then
+            error("leap.is_operator: #2 passed argument must be a class, but got ".._type(_class), 2)
+        end
+
         local _obj = obj
-        while _obj and _obj.__type ~= class.__type do
+        while _obj and _obj.__type ~= _class.__type do
             if _obj.super then
                 _obj = _obj.super
             else
