@@ -1,4 +1,20 @@
 if not _leap_internal_classBuilder then
+    local function deepcopy(orig, seen)
+        seen = seen or {}
+
+        if type(orig) ~= "table" then return orig end
+        if seen[orig] then return seen[orig] end
+
+        local copy = {}
+        seen[orig] = copy
+        
+        for k, v in pairs(orig) do
+            copy[deepcopy(k, seen)] = deepcopy(v, seen)
+        end
+        
+        return copy
+    end
+
     _leap_internal_classBuilder = function(name, prototype, baseClass)
         prototype._leap_internal_decorators = {}
 
@@ -6,27 +22,65 @@ if not _leap_internal_classBuilder then
         if not baseClass then
             error("ExtendingNotDefined: "..name.." tried to extend a class that is not defined", 2)
         end
-    
-        if baseClass.__prototype then
-            prototype.super = setmetatable({__type = baseClass.__type, __prototype = baseClass.__prototype}, {
-                __index = function(_self, key)
-                    if baseClass.__prototype.super then
-                        return baseClass.__prototype[key] or baseClass.__prototype.super[key]
-                    else
-                        return baseClass.__prototype[key]
-                    end
-                end,
+
+        local baseProto = baseClass.__prototype
+        if baseProto then
+            -- metatable chaining (if not found in prototype lookup in baseProto)
+            baseProto.super = baseProto
+            setmetatable(prototype, {__index = baseProto})
+
+            prototype.super = setmetatable({
+                __type = baseClass.__type,
+                __prototype = baseProto
+            }, {
+                __index = baseProto,
                 __call = function(_self, ...) 
-                    if not baseClass.__prototype.constructor then
+                    if not baseProto.constructor then
                         return
                     end
 
-                    return baseClass.__prototype.constructor(...)
+                    return baseProto.constructor(...)
                 end,
                 __newindex = function(self, k) error("attempted to assign class property '"..k.."' directly, please instantiate the class before assigning any properties", 2) end,
             })
         end
-    
+
+        local tableKeys = {}
+        for k,v in pairs(prototype) do
+            if _type(v) == "table" and k:sub(1, 5) ~= "_leap" then
+                table.insert(tableKeys, k)
+            end
+        end
+
+        local objMetatable = {
+            __index = prototype,
+            __gc = function(self)
+                if self.destructor then
+                    self:destructor()
+                end
+            end,
+            __tostring = function(self)
+                if self.toString then
+                    return self:toString()
+                else
+                    local info = ""
+                    for k,v in pairs(self) do
+                        if k ~= "__type" then
+                            if _type(v) == "table" then
+                                v = json.encode(v)
+                            end
+                            
+                            info = info..k..": "..tostring(v)..", "
+                        end
+                    end
+
+                    info = info:sub(1, -3)
+
+                    return "<"..self.__type..":"..(("%p"):format(self)).."> "..info
+                end
+            end
+        }
+
         _G[name] = setmetatable({__type = name, __prototype = prototype}, {
             __newindex = function(self, k, v)
                 if k:sub(1, 2) == "__" then -- Allow internal modfications
@@ -36,47 +90,31 @@ if not _leap_internal_classBuilder then
                 end
             end,
             __call = function(self, ...)
-                -- Create new object
-                local obj = setmetatable({__type = self.__type}, {
-                    __index = function(_self, key)
-                        if self.__prototype.super then
-                            return self.__prototype[key] or self.__prototype.super[key]
-                        else
-                            return self.__prototype[key]
-                        end
-                    end,
-                    __gc = function(_self)
-                        if _self.destructor then
-                            _self:destructor()
-                        end
-                    end,
-                    __tostring = function (_self)
-                        if _self.toString then
-                            return _self:toString()
-                        else
-                            return type(_self)
-                        end
-                    end
-                })
-                
-                if next(obj._leap_internal_decorators) then
-                    for _, decorator in pairs(obj._leap_internal_decorators) do
-                        local wrapper = function(...) obj[decorator.name](obj, ...) end
-                        local retval = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args))
+                local proto = self.__prototype
+                local obj = {__type = self.__type}
 
-                        obj[decorator.name] = retval or obj[decorator.name];
-                    end
+                -- deepcopy all prototype tables to prevent cross object reference issues
+                for _,k in pairs(tableKeys) do
+                    obj[k] = deepcopy(proto[k])
+                end
+
+                setmetatable(obj, objMetatable)
+
+                for _, decorator in pairs(obj._leap_internal_decorators) do
+                    local original = obj[decorator.name]
+                    local wrapper = function(...) return original(obj, ...) end
+
+                    obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
                 end
                 
                 if not self.__skipNextConstructor then
                     if obj.constructor then
                         obj:constructor(...)
-                    elseif baseClass.__prototype then
+                    elseif baseProto then
                         baseClass(...)
                     end
                 end
 
-    
                 self.__skipNextConstructor = nil
                 return obj
             end
