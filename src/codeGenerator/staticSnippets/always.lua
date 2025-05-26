@@ -7,46 +7,75 @@ if not leap then leap = {} end
 -- Function to deserialize objects (example: objects sended over the network)
 if not leap.deserialize then
     leap.deserialize = function(data)
-        if _type(data) == "table" and data.__type then
-            local _class = _G[data.__type]
+        local dataType = _type(data)
 
-            if _class then
-                _class.__skipNextConstructor = true -- Skip next constructor call
-                local obj = _class()
-
-                if obj.deserialize then
-                    obj:deserialize(data)
-                else
-                    -- Copy all properties to the new instantiated object
-                    for k, v in pairs(data) do
-                        obj[k] = v
-                    end
+        if dataType ~= "table" or not data.__type then
+            if dataType == "table" then -- tables can still contains leap serialized objects
+                local clone = {}
+                for k, v in pairs(data) do
+                    clone[k] = leap.deserialize(v)
                 end
-
-                return obj
-            else
-                error("Class '"..data.__type.."' not found", 2)
+                return clone
+            else -- primitive
+                return data
             end
-        else
-            error("leap.deserialize: passed argument must be a table (serialized object), but got ".._type(class), 2)
         end
+
+        -- get class
+        local _class = _G[data.__type]
+        if not _class then
+            error("Class '" .. data.__type .. "' not found", 2)
+        end
+
+        _class.__skipNextConstructor = true
+        local obj = _class()
+
+        if obj.deserialize then
+            obj:deserialize(data)
+        else
+            for k, v in pairs(data) do
+                if k ~= "__type" then
+                    obj[k] = leap.deserialize(v)
+                end
+            end
+        end
+
+        return obj
     end
 end
 
-if not leap.serialize then
-    leap.serialize = function(obj)
-        if obj.serialize then
-            local data = obj:serialize()
 
-            if not data then
+if not leap.serialize then
+    leap.serialize = function(data)
+        local dataType = _type(data)
+
+        if dataType ~= "table" then -- primitive
+            return data
+        end
+
+        -- custom serialize method
+        if data.serialize then
+            local serialized = data:serialize()
+            if not serialized then
                 return nil
             end
 
-            data.__type = obj.__type -- Preserve class type
-            return data
-        else
-            return table.clone(obj) -- Table clone will do the job as it will perform a shallow-copy without metatable
+            -- serialized data can still contains objects to serialize
+            for k, v in pairs(serialized) do
+                serialized[k] = leap.serialize(v)
+            end
+
+            serialized.__type = data.__type
+            return serialized
         end
+
+        -- table, deep clone
+        local clone = {}
+        for k, v in pairs(data) do
+            clone[k] = leap.serialize(v)
+        end
+
+        return clone
     end
 end
 
