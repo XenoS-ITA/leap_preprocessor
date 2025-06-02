@@ -1294,16 +1294,18 @@ class CodeGenerator extends LuaListener {
 
         // Pass all parameters
         const parctx = this.currentFunctionParList.extendedparlist()
-        const extendedparlist = parctx.extendedpar_list();
-
-        extendedparlist.forEach((extendedpar, i) => {
-            code.add(this.enterIdentifier(extendedpar.identifier()))
-            code.add(" = ")
-            code.add(this.enterIdentifier(extendedpar.identifier()))
-
-            if (i != extendedparlist.length-1)
-                code.add(",")
-        })
+        if (parctx) {
+            const extendedparlist = parctx.extendedpar_list();
+    
+            extendedparlist.forEach((extendedpar, i) => {
+                code.add(this.enterIdentifier(extendedpar.identifier()))
+                code.add(" = ")
+                code.add(this.enterIdentifier(extendedpar.identifier()))
+    
+                if (i != extendedparlist.length-1)
+                    code.add(",")
+            })
+        }
 
         code.add("}")
         
