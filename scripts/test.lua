@@ -194,3 +194,18 @@ print(sum)
 if not MyError is Error then
     print("MyError is derived from Error")
 end
+
+test = function(a, b)
+    print("adw")
+end
+
+class Test2 {
+    test = function(a, b)
+        print("adw")
+    end,
+
+    @test2()
+    test2 = function(a, b)
+        print("adw")
+    end
+}
