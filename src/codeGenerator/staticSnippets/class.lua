@@ -65,9 +65,13 @@ if not _leap_internal_classBuilder then
                 else
                     local info = ""
                     for k,v in pairs(self) do
-                        if k ~= "__type" then
+                        if k ~= "__type" and k ~= "super" and k:sub(1, 5) ~= "_leap" then
                             if _type(v) == "table" then
-                                v = json.encode(v)
+                                if getmetatable(v) then
+                                    v = tostring(v)
+                                else
+                                    v = json.encode(v)
+                                end
                             end
                             
                             info = info..k..": "..tostring(v)..", "
@@ -103,6 +107,7 @@ if not _leap_internal_classBuilder then
                 for _, decorator in pairs(obj._leap_internal_decorators) do
                     local original = obj[decorator.name]
                     local wrapper = function(...) return original(obj, ...) end
+                    leap.registerfunc(wrapper, leap.fsignature(original))
 
                     obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
                 end
