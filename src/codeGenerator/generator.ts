@@ -836,76 +836,90 @@ class CodeGenerator extends LuaListener {
 
         if (decorator_list.length > 0) {
             let funcName = "";
+            let id = null;
+            const functiondef = ctx.functiondef();
 
-            // Preserve decorators spaces
-            code.addSpaces(ctx.decorator_list()[0], ctx.functiondef());
+            // Preserve decorator formatting
+            code.addSpaces(ctx.decorator_list()[0], functiondef);
 
             if (ctx.OB()) {
-                funcName = this.enterExp(ctx.exp(0))
+                funcName = this.enterExp(ctx.exp(0));
 
-                code.add(ctx.OB())
+                code.add(ctx.OB());
                 code.add(ctx.exp(0), this.enterExp);
-                code.add(ctx.CB())
-    
-                code.add(ctx.EQ())
+                code.add(ctx.CB());
 
+                code.add(ctx.EQ());
             } else if (ctx.identifier()) {
-                funcName = this.enterIdentifier(ctx.identifier())
+                funcName = this.enterIdentifier(ctx.identifier());
 
-                code.add(ctx.identifier())
-                code.add(ctx.EQ())
+                code.add(ctx.identifier());
+                code.add(ctx.EQ());
+            }
+
+            if (functiondef) {
+                id = this.addFunctionName(funcName);
             }
 
             decorator_list.forEach(decorator => {
-                const name = this.enterVar(decorator.var_())
-                const body = this.enterDecoratorbody(decorator.decoratorbody())
+                const name = this.enterVar(decorator.var_());
+                const body = this.enterDecoratorbody(decorator.decoratorbody());
 
-                this.injecter.inNext("enterClass", CodeSnippets.classDecorator(this.insideClass, funcName, name, body))
-            })
+                this.injecter.inNext(
+                    "enterClass",
+                    CodeSnippets.classDecorator(this.insideClass, funcName, name, body)
+                );
+            });
 
-            //this.injecter.inNext("enterClass", "end")
+            code.add(functiondef, this.enterFunctiondef);
 
-            code.add(ctx.functiondef(), this.enterFunctiondef);
+            if (functiondef && id) {
+                this.removeFunctionName(id);
+            }
 
         } else if (ctx.OB()) {
-            const isfunc = ctx.exp(1).functiondef()
-            let id = null
+            const isfunc = ctx.exp(1).functiondef();
+            let id = null;
 
-            if (isfunc) id = this.addFunctionName(this.enterExp(ctx.exp(0)))
+            if (isfunc) id = this.addFunctionName(this.enterExp(ctx.exp(0)));
 
-            code.add(ctx.OB())
+            code.add(ctx.OB());
             code.add(ctx.exp(0), this.enterExp);
-            code.add(ctx.CB())
+            code.add(ctx.CB());
 
-            this.assignment = true
-            code.add(ctx.EQ())
+            this.assignment = true;
+            code.add(ctx.EQ());
             code.add(ctx.exp(1), this.enterExp);
-            this.assignment = false
+            this.assignment = false;
 
-            if (isfunc) this.removeFunctionName(id)
-        
-        } else if (ctx.DOT()) { // cfxlua (setconstructor)
-            code.add(ctx.DOT())
-            code.add(ctx.identifier())
+            if (isfunc && id) this.removeFunctionName(id);
+
+        } else if (ctx.DOT()) {
+            // cfxlua (setconstructor)
+            code.add(ctx.DOT());
+            code.add(ctx.identifier());
+
         } else if (ctx.identifier()) {
-            const isfunc = ctx.exp(0).functiondef()
-            let id = null
+            const isfunc = ctx.exp(0).functiondef();
+            let id = null;
 
-            if (isfunc) id = this.addFunctionName(this.enterIdentifier(ctx.identifier()))
+            if (isfunc) id = this.addFunctionName(this.enterIdentifier(ctx.identifier()));
 
-            code.add(ctx.identifier())
+            code.add(ctx.identifier());
 
-            this.assignment = true
-            code.add(ctx.EQ())
+            this.assignment = true;
+            code.add(ctx.EQ());
             code.add(ctx.exp(0), this.enterExp);
-            this.assignment = false
+            this.assignment = false;
 
-            if (isfunc) this.removeFunctionName(id)
+            if (isfunc && id) this.removeFunctionName(id);
+
         } else {
             code.add(ctx.exp(0), this.enterExp);
         }
 
         return code.get();
+
     }
 
     enterFieldsep = (ctx: FieldsepContext): string => {
