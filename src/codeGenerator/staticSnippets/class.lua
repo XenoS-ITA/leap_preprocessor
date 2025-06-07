@@ -1,18 +1,64 @@
 if not _leap_internal_classBuilder then
-    local function deepcopy(orig, seen)
-        seen = seen or {}
+    local mt_super = {
+        __index = function(_, key)
+            local val = _.proto[key]
 
+            if type(val) == "function" then
+                local cached = self.cache[key]
+
+                if not cached then
+                    cached = function(_, ...)
+                        return val(_.obj, ...)
+                    end
+
+                    self.cache[key] = cached
+                end
+
+                return cached
+            else
+                return val
+            end
+        end,
+
+        __call = function(_, ...)
+            if _.proto.constructor then
+                local old = _.obj.super
+                _.obj.super = _leap_internal_class_makeSuper(_.obj, _.proto.__base)
+
+                local ret = _.proto.constructor(_.obj, ...)
+
+                _.obj.super = old
+                return ret
+            else
+                error("leap: super class has no constructor", 2)
+            end
+        end,
+
+        __newindex = function()
+            error("cannot assign to super", 2)
+        end,
+    }
+
+    local function deepcopy(orig, seen)
         if type(orig) ~= "table" then return orig end
-        if seen[orig] then return seen[orig] end
+        if seen and seen[orig] then return seen[orig] end
 
         local copy = {}
+        seen = seen or {}
         seen[orig] = copy
-        
-        for k, v in pairs(orig) do
-            copy[deepcopy(k, seen)] = deepcopy(v, seen)
+
+        for k, v in next, orig do
+            local kcopy = type(k) == "table" and deepcopy(k, seen) or k
+            local vcopy = type(v) == "table" and deepcopy(v, seen) or v
+
+            copy[kcopy] = vcopy
         end
-        
+
         return copy
+    end
+
+    function _leap_internal_class_makeSuper(obj, proto)
+        return setmetatable({cache = {}, proto = proto, obj = obj}, mt_super)
     end
 
     _leap_internal_classBuilder = function(name, prototype, baseClass)
@@ -27,12 +73,15 @@ if not _leap_internal_classBuilder then
         if baseProto then
             -- metatable chaining (if not found in prototype lookup in baseProto)
             setmetatable(prototype, {__index = baseProto})
+            prototype.__base = baseProto
         end 
 
         local tableKeys = {}
-        for k,v in pairs(prototype) do
+        local i = 1
+        for k, v in next, prototype do
             if _type(v) == "table" and k:sub(1, 5) ~= "_leap" then
-                table.insert(tableKeys, k)
+                tableKeys[i] = k
+                i = i + 1
             end
         end
 
@@ -82,8 +131,9 @@ if not _leap_internal_classBuilder then
                 local obj = {__type = self.__type}
 
                 -- deepcopy all prototype tables to prevent cross object reference issues
-                for _,k in pairs(tableKeys) do
-                    obj[k] = deepcopy(proto[k])
+                for j = 1, #tableKeys do
+                    local key = tableKeys[j]
+                    obj[key] = deepcopy(proto[key])
                 end
 
                 setmetatable(obj, objMetatable)
@@ -96,28 +146,7 @@ if not _leap_internal_classBuilder then
                     obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
                 end
                 
-                obj.super = setmetatable({}, {
-                    __index = function(_, key)
-                        local baseFunc = baseProto[key]
-                        if type(baseFunc) == "function" then
-                            return function(...)
-                                return baseFunc(obj, ...)
-                            end
-                        else
-                            return baseFunc
-                        end
-                    end,
-
-                    __call = function(_, ...)
-                        if baseProto.constructor then
-                            return baseProto.constructor(obj, ...)
-                        end
-                    end,
-
-                    __newindex = function(_, k)
-                        error("attempted to assign class property '"..k.."' directly, please instantiate the class before assigning any properties", 2)
-                    end
-                })
+                obj.super = _leap_internal_class_makeSuper(obj, prototype.__base)
 
                 if not self.__skipNextConstructor then
                     if obj.constructor then
