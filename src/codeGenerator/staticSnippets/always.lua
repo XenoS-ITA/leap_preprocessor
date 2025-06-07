@@ -53,11 +53,25 @@ if not leap.serialize then
             return data
         end
 
+        -- If the actual type is a normal table (no class) then serialize each element
+        if type(data) == "table" then
+            local ret = {}
+            for k, v in pairs(data) do
+                ret[k] = leap.serialize(v)
+            end
+
+            return ret
+        end
+
         -- custom serialize method
         if data.serialize then
             local serialized = data:serialize()
             if not serialized then
                 return nil
+            end
+
+            if type(serialized) ~= "table" then
+                error("leap.serialize: custom serialize method must return a table", 2)
             end
 
             -- serialized data can still contains objects to serialize
@@ -69,13 +83,36 @@ if not leap.serialize then
             return serialized
         end
 
-        -- table, deep clone
+        -- normal serialization, table deep clone
         local clone = {}
         for k, v in pairs(data) do
-            clone[k] = leap.serialize(v)
+            if k ~= "__stack" then -- ignore internal variables
+                local skip = false
+                
+                if data.__ignoreList then
+                    for _k,_v in pairs(data.__ignoreList) do
+                        if k == _v then
+                            skip = true
+                            break
+                        end
+                    end
+                end
+                
+                if not skip then
+                    clone[k] = leap.serialize(v)
+                end
+            end
         end
 
         return clone
+    end
+end
+
+if not skipSerialize then
+    skipSerialize = function(class, ignoreList)
+        if _type(class) ~= "table" then error("skipSerialize: #1 passed argument must be a class, but got "..type(class), 2) end
+
+        class.__prototype.__ignoreList = ignoreList
     end
 end
 
