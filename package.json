@@ -1,10 +1,26 @@
 {
+  "name": "leap-v3",
+  "description": "V3 of Leap using ANTLR4",
+  "author": "XenoS",
+  "version": "3.0.0",
+  "type": "commonjs",
   "scripts": {
-    "run": "node index.js"
+    "start": "npm run build && node scripts/test.js",
+    "startdbg": "npm run build && node --enable-source-maps scripts/test.js",
+    "startfull": "npm run build:grammar && npm run build && node scripts/test.js",
+    "build:grammar": "antlr -o src/grammar -Dlanguage=TypeScript grammar/leap/LuaLexer.g4 grammar/leap/LuaParser.g4",
+    "build": "node scripts/build.js"
   },
+  "license": "ISC",
   "dependencies": {
     "antlr4": "^4.13.2",
-    "glob": "^10.3.10",
+    "antlr4ts": "^0.5.0-alpha.4",
     "luamin": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.6",
+    "esbuild": "^0.24.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
   }
 }

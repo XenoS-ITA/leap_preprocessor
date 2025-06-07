@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "target": "ES2021",
+      "module": "CommonJS",
+      "moduleResolution": "Node",
+      "esModuleInterop": true,
+      "outDir": "ts-dist",
+      "typeRoots": ["node_modules/@types"],
+    },
+    "include": [
+      "src/**/*.ts",                       // Include all TypeScript files in the src directory
+    ],
+    "exclude": ["node_modules"]            // Exclude node_modules directory
+  }
+  
