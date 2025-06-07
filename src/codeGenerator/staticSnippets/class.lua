@@ -1,47 +1,36 @@
 if not _leap_internal_classBuilder then
-    local mt_super = {
-        __index = function(self, key)
-            local val = self.parent.__prototype[key]
+    local getCurrentClass = function(obj)
+        return obj.__stack[#obj.__stack]
+    end
 
-            if type(val) == "function" then
-                local cached = self.cache[key]
+    local getCurrentPrototype = function(obj)
+        local class = getCurrentClass(obj)
 
-                if not cached then
-                    cached = function(_, ...)
-                        return val(_.obj, ...)
-                    end
+        --print("Current level", #obj.__stack, class?.__type)
+        return class and class.__prototype
+    end
 
-                    self.cache[key] = cached
-                end
+    local getCurrentType = function(obj)
+        local class = getCurrentClass(obj)
+        return class and class.__type
+    end
 
-                return cached
-            else
-                return val
-            end
-        end,
+    local pushParentOfPrototype = function(obj, proto)
+        if not proto.__parent then
+            --print("Adding nil parent")
+            table.insert(obj.__stack, {})
+        else
+            --print("Adding parent", proto.__parent.__type)
+            table.insert(obj.__stack, proto.__parent)
+        end
+    end
 
-        __call = function(self, ...)
-            if self.parent.__prototype.constructor then
-                local old = self.obj.super
-                -- When calling parent constructor we need to set the super class to the parent of the parent (obj > parent (super) > parent (super.super))
-                self.obj.super = _leap_internal_class_makeSuper(self.obj, self.parent.__prototype.__parent)
+    local popParent = function(obj)
+        local parent = table.remove(obj.__stack)
+        --print("Popping parent", parent and parent.__type)
+    end
 
-                local ret = self.parent.__prototype.constructor(self.obj, ...)
-
-                -- Reset the super class to this parent
-                self.obj.super = old
-                return ret
-            else
-                error("leap: super class has no constructor", 2)
-            end
-        end,
-
-        __newindex = function()
-            error("cannot assign to super", 2)
-        end,
-    }
-
-    local function deepcopy(orig, seen)
+    local deepcopy = function(orig, seen)
         if type(orig) ~= "table" then return orig end
         if seen and seen[orig] then return seen[orig] end
 
@@ -59,9 +48,47 @@ if not _leap_internal_classBuilder then
         return copy
     end
 
-    function _leap_internal_class_makeSuper(obj, parent)
-        return setmetatable({cache = {}, parent = parent, obj = obj}, mt_super)
+    local mt_super = {
+        __index = function(self, key)
+            if key == "__type" then
+                return getCurrentType(self.obj)
+            else
+                local proto = getCurrentPrototype(self.obj)
+    
+                -- No parent
+                if not proto or next(proto) == nil then
+                    return nil
+                end
+    
+                local member = proto[key]
+                
+                if type(member) == "function" then
+                    return function(_, ...)
+                        pushParentOfPrototype(self.obj, proto)
+                            local ret = member(self.obj, ...)
+                        popParent(self.obj)
+
+                        return ret
+                    end
+                else
+                    return member
+                end
+            end
+        end,
+        __call = function(self, ...)
+            local constructor = self.constructor
+
+            if constructor then
+                return constructor(...)
+            end
+        end
+    }
+
+    function _leap_internal_class_makeSuper(obj)
+        return setmetatable({obj = obj}, mt_super)
     end
+
+
 
     _leap_internal_classBuilder = function(name, prototype, baseClass)
         prototype._leap_internal_decorators = {}
@@ -71,10 +98,30 @@ if not _leap_internal_classBuilder then
             error("ExtendingNotDefined: "..name.." tried to extend a class that is not defined", 2)
         end
 
-        local baseProto = baseClass.__prototype
-        if baseProto then
-            -- metatable chaining (if not found in prototype lookup in baseProto)
-            setmetatable(prototype, {__index = baseProto})
+        if baseClass.__prototype then
+            -- Keep track of the stack of parent classes also when doing metatable chaining!
+            setmetatable(prototype, {
+                __index = function(_, key)
+                    local val = baseClass.__prototype[key]
+                    
+                    if type(val) == "function" then
+                        return function(self, ...)
+                            local prototype = getCurrentPrototype(self)
+                            if not prototype or next(prototype) == nil then
+                                return nil
+                            end
+
+                            pushParentOfPrototype(self, prototype)
+                                local ret = val(self, ...)
+                            popParent(self)
+                            
+                            return ret
+                        end
+                    else
+                        return val
+                    end
+                end
+            })
             prototype.__parent = baseClass
         end 
 
@@ -87,6 +134,7 @@ if not _leap_internal_classBuilder then
             end
         end
 
+        --#region Metatable
         local objMetatable = {
             __index = prototype,
             __gc = function(self)
@@ -100,7 +148,7 @@ if not _leap_internal_classBuilder then
                 else
                     local info = ""
                     for k,v in pairs(self) do
-                        if k ~= "__type" and k ~= "super" and k:sub(1, 5) ~= "_leap" then
+                        if k ~= "super" and k:sub(1, 5) ~= "_leap" and k:sub(1, 2) ~= "__" then
                             if _type(v) == "table" then
                                 if getmetatable(v) then
                                     v = tostring(v)
@@ -119,6 +167,7 @@ if not _leap_internal_classBuilder then
                 end
             end
         }
+        --#endregion
 
         _G[name] = setmetatable({__type = name, __prototype = prototype}, {
             __newindex = function(self, k, v)
@@ -129,18 +178,25 @@ if not _leap_internal_classBuilder then
                 end
             end,
             __call = function(self, ...)
-                local proto = self.__prototype
-                local obj = {__type = self.__type}
+                --#region Object Instantiation
+                local obj = {__type = self.__type, __stack = {}}
 
                 -- deepcopy all prototype tables to prevent cross object reference issues
                 for j = 1, #tableKeys do
                     local key = tableKeys[j]
-                    obj[key] = deepcopy(proto[key])
+                    obj[key] = deepcopy(self.__prototype[key])
                 end
 
                 setmetatable(obj, objMetatable)
-                obj.super = _leap_internal_class_makeSuper(obj, prototype.__parent)
+                --#endregion
 
+                local parentclass = self.__prototype.__parent
+                if parentclass then
+                    obj.super = _leap_internal_class_makeSuper(obj)
+                    pushParentOfPrototype(obj, self.__prototype)
+                end
+
+                --#region Decorators Application
                 for _, decorator in pairs(obj._leap_internal_decorators) do
                     local original = obj[decorator.name]
                     local wrapper = function(...) return original(obj, ...) end
@@ -148,15 +204,15 @@ if not _leap_internal_classBuilder then
 
                     obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
                 end
+                --#endregion
                 
-
+                -- #region Constructor Call
                 if not self.__skipNextConstructor then
                     if obj.constructor then
                         obj:constructor(...)
-                    elseif baseProto then
-                        baseClass(...)
                     end
                 end
+                -- #endregion
 
                 self.__skipNextConstructor = nil
                 return obj
