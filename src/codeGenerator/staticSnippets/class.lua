@@ -1,7 +1,7 @@
 if not _leap_internal_classBuilder then
     local mt_super = {
-        __index = function(_, key)
-            local val = _.proto[key]
+        __index = function(self, key)
+            local val = self.parent.__prototype[key]
 
             if type(val) == "function" then
                 local cached = self.cache[key]
@@ -20,14 +20,16 @@ if not _leap_internal_classBuilder then
             end
         end,
 
-        __call = function(_, ...)
-            if _.proto.constructor then
-                local old = _.obj.super
-                _.obj.super = _leap_internal_class_makeSuper(_.obj, _.proto.__base)
+        __call = function(self, ...)
+            if self.parent.__prototype.constructor then
+                local old = self.obj.super
+                -- When calling parent constructor we need to set the super class to the parent of the parent (obj > parent (super) > parent (super.super))
+                self.obj.super = _leap_internal_class_makeSuper(self.obj, self.parent.__prototype.__parent)
 
-                local ret = _.proto.constructor(_.obj, ...)
+                local ret = self.parent.__prototype.constructor(self.obj, ...)
 
-                _.obj.super = old
+                -- Reset the super class to this parent
+                self.obj.super = old
                 return ret
             else
                 error("leap: super class has no constructor", 2)
@@ -57,8 +59,8 @@ if not _leap_internal_classBuilder then
         return copy
     end
 
-    function _leap_internal_class_makeSuper(obj, proto)
-        return setmetatable({cache = {}, proto = proto, obj = obj}, mt_super)
+    function _leap_internal_class_makeSuper(obj, parent)
+        return setmetatable({cache = {}, parent = parent, obj = obj}, mt_super)
     end
 
     _leap_internal_classBuilder = function(name, prototype, baseClass)
@@ -73,7 +75,7 @@ if not _leap_internal_classBuilder then
         if baseProto then
             -- metatable chaining (if not found in prototype lookup in baseProto)
             setmetatable(prototype, {__index = baseProto})
-            prototype.__base = baseProto
+            prototype.__parent = baseClass
         end 
 
         local tableKeys = {}
@@ -137,6 +139,7 @@ if not _leap_internal_classBuilder then
                 end
 
                 setmetatable(obj, objMetatable)
+                obj.super = _leap_internal_class_makeSuper(obj, prototype.__parent)
 
                 for _, decorator in pairs(obj._leap_internal_decorators) do
                     local original = obj[decorator.name]
@@ -146,7 +149,6 @@ if not _leap_internal_classBuilder then
                     obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
                 end
                 
-                obj.super = _leap_internal_class_makeSuper(obj, prototype.__base)
 
                 if not self.__skipNextConstructor then
                     if obj.constructor then
@@ -187,10 +189,14 @@ if not _leap_internal_is_operator then
             error("leap.is_operator: #2 passed argument must be a class, but got ".._type(_class), 2)
         end
 
+        if obj.__prototype then
+            error("leap.is_operator: #1 passed argument must be a class instance, but got class", 2)
+        end
+
         local _obj = obj
         while _obj and _obj.__type ~= _class.__type do
             if _obj.super then
-                _obj = _obj.super
+                _obj = _obj.super.parent -- Extract parent info
             else
                 return false
             end
