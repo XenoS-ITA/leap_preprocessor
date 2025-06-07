@@ -26,24 +26,8 @@ if not _leap_internal_classBuilder then
         local baseProto = baseClass.__prototype
         if baseProto then
             -- metatable chaining (if not found in prototype lookup in baseProto)
-            baseProto.super = baseProto
             setmetatable(prototype, {__index = baseProto})
-
-            prototype.super = setmetatable({
-                __type = baseClass.__type,
-                __prototype = baseProto
-            }, {
-                __index = baseProto,
-                __call = function(_self, ...) 
-                    if not baseProto.constructor then
-                        return
-                    end
-
-                    return baseProto.constructor(...)
-                end,
-                __newindex = function(self, k) error("attempted to assign class property '"..k.."' directly, please instantiate the class before assigning any properties", 2) end,
-            })
-        end
+        end 
 
         local tableKeys = {}
         for k,v in pairs(prototype) do
@@ -112,6 +96,29 @@ if not _leap_internal_classBuilder then
                     obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
                 end
                 
+                obj.super = setmetatable({}, {
+                    __index = function(_, key)
+                        local baseFunc = baseProto[key]
+                        if type(baseFunc) == "function" then
+                            return function(...)
+                                return baseFunc(obj, ...)
+                            end
+                        else
+                            return baseFunc
+                        end
+                    end,
+
+                    __call = function(_, ...)
+                        if baseProto.constructor then
+                            return baseProto.constructor(obj, ...)
+                        end
+                    end,
+
+                    __newindex = function(_, k)
+                        error("attempted to assign class property '"..k.."' directly, please instantiate the class before assigning any properties", 2)
+                    end
+                })
+
                 if not self.__skipNextConstructor then
                     if obj.constructor then
                         obj:constructor(...)
