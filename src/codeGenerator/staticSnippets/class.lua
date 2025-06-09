@@ -107,15 +107,19 @@ if not _leap_internal_classBuilder then
                     if type(val) == "function" then
                         return function(self, ...)
                             local prototype = getCurrentPrototype(self)
-                            if not prototype or next(prototype) == nil then
-                                return nil
-                            end
 
-                            pushParentOfPrototype(self, prototype)
-                                local ret = val(self, ...)
-                            popParent(self)
-                            
-                            return ret
+                            -- If a method is called from a subclass dont push the parent, only if called from outside the class hierarchy (outside main or subclasses)
+                            local insideSubclass = #self.__stack > 1
+
+                            if insideSubclass or (not prototype or next(prototype) == nil) then
+                                return val(self, ...)
+                            else -- If it has a parent and this function has not been called from the class hierarchy then push the parent
+                                pushParentOfPrototype(self, prototype)
+                                    local ret = val(self, ...)
+                                popParent(self)
+
+                                return ret
+                            end
                         end
                     else
                         return val
