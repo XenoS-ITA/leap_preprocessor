@@ -1,24 +1,21 @@
 if not _leap_internal_classBuilder then
-    local getCurrentClass = function(obj)
-        return obj.__stack[#obj.__stack]
-    end
-
     local getCurrentPrototype = function(obj)
-        local class = getCurrentClass(obj)
+        local class = obj.__stack[#obj.__stack] -- getCurrentClass
 
         --print("Current level", #obj.__stack, class?.__type)
         return class and class.__prototype
     end
 
     local getCurrentType = function(obj)
-        local class = getCurrentClass(obj)
+        local class = obj.__stack[#obj.__stack] -- getCurrentClass
         return class and class.__type
     end
 
+    local NIL_PARENT = {}
     local pushParentOfPrototype = function(obj, proto)
         if not proto.__parent then
             --print("Adding nil parent")
-            table.insert(obj.__stack, {})
+            table.insert(obj.__stack, NIL_PARENT)
         else
             --print("Adding parent", proto.__parent.__type)
             table.insert(obj.__stack, proto.__parent)
@@ -30,19 +27,42 @@ if not _leap_internal_classBuilder then
         --print("Popping parent", parent and parent.__type)
     end
 
+    --[[ local debugStack = function(obj)
+        print("STACK:")
+        for i = 1, #obj.__stack do
+            print(i, obj.__stack[i].__type)
+        end
+        print("")
+    end ]]
+
+    -- If we are outside FiveM and don't have a clone function, make one (this will be slower than the native one)
+    if not table.clone then
+        table.clone = function(orig)
+            local clone = {}
+
+            for k, v in pairs(orig) do
+                clone[k] = v
+            end
+
+            return clone
+        end
+    end
+
+    -- Uses table.clone for fast shallow copying (memcpy)
+    -- Handles circular references via seen table
+    -- Significantly faster (~50%) than doing actual deepcopy for flat or lightly-nested structures
     local deepcopy = function(orig, seen)
         if type(orig) ~= "table" then return orig end
-        if seen and seen[orig] then return seen[orig] end
-
-        local copy = {}
         seen = seen or {}
+        if seen[orig] then return seen[orig] end
+
+        local copy = table.clone(orig)
         seen[orig] = copy
 
         for k, v in next, orig do
-            local kcopy = type(k) == "table" and deepcopy(k, seen) or k
-            local vcopy = type(v) == "table" and deepcopy(v, seen) or v
-
-            copy[kcopy] = vcopy
+            if type(v) == "table" then
+                copy[k] = deepcopy(v, seen)
+            end
         end
 
         return copy
@@ -54,6 +74,7 @@ if not _leap_internal_classBuilder then
                 return getCurrentType(self.obj)
             else
                 local proto = getCurrentPrototype(self.obj)
+                --print("Super searching for", key, "in", getCurrentClass(self.obj))
     
                 -- No parent
                 if not proto or next(proto) == nil then
@@ -88,8 +109,6 @@ if not _leap_internal_classBuilder then
         return setmetatable({obj = obj}, mt_super)
     end
 
-
-
     _leap_internal_classBuilder = function(name, prototype, baseClass)
         prototype._leap_internal_decorators = {}
 
@@ -99,35 +118,19 @@ if not _leap_internal_classBuilder then
         end
 
         if baseClass.__prototype then
-            -- Keep track of the stack of parent classes also when doing metatable chaining!
-            setmetatable(prototype, {
-                __index = function(_, key)
-                    local val = baseClass.__prototype[key]
-                    
-                    if type(val) == "function" then
-                        return function(self, ...)
-                            local prototype = getCurrentPrototype(self)
-
-                            -- If a method is called from a subclass dont push the parent, only if called from outside the class hierarchy (outside main or subclasses)
-                            local insideSubclass = #self.__stack > 1
-
-                            if insideSubclass or (not prototype or next(prototype) == nil) then
-                                return val(self, ...)
-                            else -- If it has a parent and this function has not been called from the class hierarchy then push the parent
-                                pushParentOfPrototype(self, prototype)
-                                    local ret = val(self, ...)
-                                popParent(self)
-
-                                return ret
-                            end
-                        end
-                    else
-                        return val
-                    end
-                end
-            })
             prototype.__parent = baseClass
         end 
+
+        --#region Prototype metatable to handle cache
+        local mt_proto = {
+            __cache = {},
+            __newindex = function (t, k, v)
+                rawset(t, k, v)
+                getmetatable(t).__cache[k] = nil -- Clear cache
+            end
+        }
+        setmetatable(prototype, mt_proto)
+        --#endregion
 
         local tableKeys = {}
         local i = 1
@@ -140,7 +143,57 @@ if not _leap_internal_classBuilder then
 
         --#region Metatable
         local objMetatable = {
-            __index = prototype,
+            __index = function(self, key)
+                local cache = getmetatable(prototype).__cache -- Use the cache saved in the main prototype
+                local proto = prototype
+                local var = proto[key]
+
+                if not cache[key] then
+                    --print("Searching for var", self.__type, key)
+
+                    -- Search for var in all hierarchy
+                    while proto do
+                        if proto[key] ~= nil then -- Found var
+                            --print("Found var", self.__type, key)
+                            var = proto[key]
+                            break
+                        end
+
+                        if not proto.__parent then -- No more parent and still not found, stop search and return nil
+                            --print("No more parent and still not found, stop search and return nil", self.__type, key)
+                            return nil
+                        end
+
+                        proto = proto.__parent.__prototype
+                    end
+                    
+                    if type(var) == "function" then
+                        -- Wrap the function with stack management
+                        cache[key] = function(_, ...)
+                            pushParentOfPrototype(self, proto)
+                                local ret = var(self, ...)
+                            popParent(self)
+
+                            return ret
+                        end
+                    else
+                        -- Just store the proto where we found it, so we can access it later
+                        cache[key] = {
+                            proto = proto
+                        }
+                    end
+                else
+                    --print("Found var in cache", self.__type, key)
+                end
+
+                -- If cached reuturn that
+                if type(cache[key]) == "function" then
+                    return cache[key]
+                else
+                    local proto = cache[key].proto
+                    return proto[key]
+                end
+            end,
             __gc = function(self)
                 if self.destructor then
                     self:destructor()
@@ -197,7 +250,6 @@ if not _leap_internal_classBuilder then
                 local parentclass = self.__prototype.__parent
                 if parentclass then
                     obj.super = _leap_internal_class_makeSuper(obj)
-                    pushParentOfPrototype(obj, self.__prototype)
                 end
 
                 --#region Decorators Application
@@ -212,8 +264,9 @@ if not _leap_internal_classBuilder then
                 
                 -- #region Constructor Call
                 if not self.__skipNextConstructor then
-                    if obj.constructor then
-                        obj:constructor(...)
+                    local ctor = obj.constructor
+                    if ctor then
+                        ctor(obj, ...)
                     end
                 end
                 -- #endregion

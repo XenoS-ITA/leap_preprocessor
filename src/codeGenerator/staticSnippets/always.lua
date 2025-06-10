@@ -130,7 +130,7 @@ end
 if not leap.registerfunc then
     leap.registerfunc = function(func, metadata)
         if not __leap__introspection then
-            __leap__introspection = {}
+            __leap__introspection = setmetatable({}, { __mode = "k" }) -- weak keys
         end
 
         __leap__introspection[func] = metadata
