@@ -139,6 +139,10 @@ if not leap.registerfunc then
     end
 end
 
+if not leap.minimal then
+    leap.minimal = false
+end
+
 -- Type override (allow custom types)
 if not _type then
     _type = type -- we preserve the original "type" function

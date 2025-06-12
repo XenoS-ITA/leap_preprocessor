@@ -207,31 +207,33 @@ if not _leap_internal_classBuilder then
                 else
                     local info = ""
 
-                    for k,v in pairs(self) do
-                        if k ~= "super" and k:sub(1, 5) ~= "_leap" and k:sub(1, 2) ~= "__" then
-                            local vtype = _type(v)
-
-                            if vtype ~= "function" then
-                                local val = v
-
-                                if vtype == "table" then
-                                    local mt = getmetatable(v)
-
-                                    if not mt or not mt.__tostring then
-                                        val = json.encode(v)
+                    if not leap.minimal then
+                        for k,v in pairs(self) do
+                            if k ~= "super" and k:sub(1, 5) ~= "_leap" and k:sub(1, 2) ~= "__" then
+                                local vtype = _type(v)
+    
+                                if vtype ~= "function" then
+                                    local val = v
+    
+                                    if vtype == "table" then
+                                        local mt = getmetatable(v)
+    
+                                        if not mt or not mt.__tostring then
+                                            val = json.encode(v)
+                                        end
                                     end
+                                    
+                                    if vtype == "string" then
+                                        val = '"'..v..'"'
+                                    end
+    
+                                    info = info..k..": "..tostring(val)..", "
                                 end
-                                
-                                if vtype == "string" then
-                                    val = '"'..v..'"'
-                                end
-
-                                info = info..k..": "..tostring(val)..", "
                             end
                         end
+    
+                        info = info:sub(1, -3)
                     end
-
-                    info = info:sub(1, -3)
 
                     return "<"..self.__type..":"..(("%p"):format(self)).."> "..info
                 end
