@@ -51,7 +51,7 @@ if not _leap_internal_classBuilder then
     -- Uses table.clone for fast shallow copying (memcpy)
     -- Handles circular references via seen table
     -- Significantly faster (~50%) than doing actual deepcopy for flat or lightly-nested structures
-    local deepcopy = function(orig, seen)
+    _leap_internal_deepcopy = function(orig, seen)
         if type(orig) ~= "table" then return orig end
         seen = seen or {}
         if seen[orig] then return seen[orig] end
@@ -61,7 +61,7 @@ if not _leap_internal_classBuilder then
 
         for k, v in next, orig do
             if type(v) == "table" then
-                copy[k] = deepcopy(v, seen)
+                copy[k] = _leap_internal_deepcopy(v, seen)
             end
         end
 
@@ -81,18 +81,20 @@ if not _leap_internal_classBuilder then
                     return nil
                 end
     
-                local member = proto[key]
+                local var = proto[key]
                 
-                if type(member) == "function" then
-                    return function(_, ...)
+                if type(var) == "function" then
+                    local sig = leap.fsignature(var)
+
+                    return leap.registerfunc(function(_, ...)
                         pushParentOfPrototype(self.obj, proto)
-                            local ret = member(self.obj, ...)
+                            local ret = table.pack(var(self.obj, ...))
                         popParent(self.obj)
 
-                        return ret
-                    end
+                        return table.unpack(ret)
+                    end, sig)
                 else
-                    return member
+                    return var
                 end
             end
         end,
@@ -168,16 +170,18 @@ if not _leap_internal_classBuilder then
                     end
                     
                     if type(var) == "function" then
+                        local sig = leap.fsignature(var)
+
                         -- Wrap the function with stack management
-                        cache[key] = function(_, ...)
+                        cache[key] = leap.registerfunc(function(_, ...)
                             if not _ then error("leap: You need to pass self when calling a class method", 2) end
 
                             pushParentOfPrototype(_, proto)
-                                local ret = var(_, ...)
+                                local ret = table.pack(var(_, ...))
                             popParent(_)
 
-                            return ret
-                        end
+                            return table.unpack(ret)
+                        end, sig)
                     else
                         -- Just store the proto where we found it, so we can access it later
                         cache[key] = {
@@ -256,7 +260,7 @@ if not _leap_internal_classBuilder then
                 -- deepcopy all prototype tables to prevent cross object reference issues
                 for j = 1, #tableKeys do
                     local key = tableKeys[j]
-                    obj[key] = deepcopy(self.__prototype[key])
+                    obj[key] = _leap_internal_deepcopy(self.__prototype[key])
                 end
 
                 setmetatable(obj, objMetatable)
