@@ -206,17 +206,28 @@ if not _leap_internal_classBuilder then
                     return self:toString()
                 else
                     local info = ""
+
                     for k,v in pairs(self) do
                         if k ~= "super" and k:sub(1, 5) ~= "_leap" and k:sub(1, 2) ~= "__" then
-                            if _type(v) == "table" then
-                                if getmetatable(v) then
-                                    v = tostring(v)
-                                else
-                                    v = json.encode(v)
+                            local vtype = _type(v)
+
+                            if vtype ~= "function" then
+                                local val = v
+
+                                if vtype == "table" then
+                                    local mt = getmetatable(v)
+
+                                    if not mt or not mt.__tostring then
+                                        val = json.encode(v)
+                                    end
                                 end
+                                
+                                if vtype == "string" then
+                                    val = '"'..v..'"'
+                                end
+
+                                info = info..k..": "..tostring(val)..", "
                             end
-                            
-                            info = info..k..": "..tostring(v)..", "
                         end
                     end
 
