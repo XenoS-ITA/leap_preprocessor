@@ -170,9 +170,11 @@ if not _leap_internal_classBuilder then
                     if type(var) == "function" then
                         -- Wrap the function with stack management
                         cache[key] = function(_, ...)
-                            pushParentOfPrototype(self, proto)
-                                local ret = var(self, ...)
-                            popParent(self)
+                            if not _ then error("leap: You need to pass self when calling a class method", 2) end
+
+                            pushParentOfPrototype(_, proto)
+                                local ret = var(_, ...)
+                            popParent(_)
 
                             return ret
                         end
