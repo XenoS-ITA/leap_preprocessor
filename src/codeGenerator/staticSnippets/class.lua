@@ -35,39 +35,6 @@ if not _leap_internal_classBuilder then
         print("")
     end ]]
 
-    -- If we are outside FiveM and don't have a clone function, make one (this will be slower than the native one)
-    if not table.clone then
-        table.clone = function(orig)
-            local clone = {}
-
-            for k, v in pairs(orig) do
-                clone[k] = v
-            end
-
-            return clone
-        end
-    end
-
-    -- Uses table.clone for fast shallow copying (memcpy)
-    -- Handles circular references via seen table
-    -- Significantly faster (~50%) than doing actual deepcopy for flat or lightly-nested structures
-    _leap_internal_deepcopy = function(orig, seen)
-        if type(orig) ~= "table" then return orig end
-        seen = seen or {}
-        if seen[orig] then return seen[orig] end
-
-        local copy = table.clone(orig)
-        seen[orig] = copy
-
-        for k, v in next, orig do
-            if type(v) == "table" then
-                copy[k] = _leap_internal_deepcopy(v, seen)
-            end
-        end
-
-        return copy
-    end
-
     local mt_super = {
         __index = function(self, key)
             if key == "__type" then
@@ -327,8 +294,8 @@ if not _leap_internal_is_operator then
 
         local _obj = obj
         while _obj and _obj.__type ~= _class.__type do
-            if _obj.super then
-                _obj = _obj.super.parent -- Extract parent info
+            if _obj.__parent or _obj.__prototype.__parent then
+                _obj = _obj.__parent or _obj.__prototype.__parent
             else
                 return false
             end
