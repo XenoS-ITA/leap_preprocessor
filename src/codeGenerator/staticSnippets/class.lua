@@ -55,10 +55,20 @@ if not _leap_internal_classBuilder then
 
                     return leap.registerfunc(function(_, ...)
                         pushParentOfPrototype(self.obj, proto)
-                            local ret = table.pack(var(self.obj, ...))
+                            local ret = table.pack(pcall(var, self.obj, ...))
                         popParent(self.obj)
 
-                        return table.unpack(ret)
+                        if not ret[1] then
+                            local msg = tostring(ret[2])
+                        
+                            if msg:sub(1,1) == "@" then
+                                error(msg, 0)
+                            else
+                                error(msg, 2) -- rethrow, shift error 1 stack level up
+                            end
+                        end
+
+                        return table.unpack(ret, 2, ret.n)
                     end, sig)
                 else
                     return var
@@ -144,10 +154,20 @@ if not _leap_internal_classBuilder then
                             if not _ then error("leap: You need to pass self when calling a class method", 2) end
 
                             pushParentOfPrototype(_, proto)
-                                local ret = table.pack(var(_, ...))
+                                local ret = table.pack(pcall(var, _, ...))
                             popParent(_)
 
-                            return table.unpack(ret)
+                            if not ret[1] then
+                                local msg = tostring(ret[2])
+                            
+                                if msg:sub(1,1) == "@" then
+                                    error(msg, 0)
+                                else
+                                    error(msg, 2) -- rethrow, shift error 1 stack level up
+                                end
+                            end
+
+                            return table.unpack(ret, 2, ret.n)
                         end, sig)
                     else
                         -- Just store the proto where we found it, so we can access it later

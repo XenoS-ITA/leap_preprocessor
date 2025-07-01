@@ -192,6 +192,30 @@ if not _leap_internal_deepcopy then
     end
 end
 
+-- Currently not used since there's still to much garbage in the stack trace and class functions are wrapped and so they lose the correct name, still finding a way to do it
+-- This is a stack trace function inspired by fivem stack traceback
+--[[ if not _leap_internal_errorWithStack then
+    _leap_internal_errorWithStack = function(msg, stacklvl, lvl)
+        if type(msg) ~= "string" then error("errorWithStack: #1 passed argument must be a string, but got "..type(msg), 2) end
+        if type(stacklvl) ~= "number" then error("errorWithStack: #2 passed argument must be a number, but got "..type(stacklvl), 2) end
+        if type(lvl) ~= "number" then error("errorWithStack: #3 passed argument must be a number, but got "..type(lvl), 2) end
+
+        local err = debug.traceback(msg, stacklvl+1)
+        -- Use hex for 0-255 since js luaminifier try to parse it in strange way 
+        err = err:match("stack traceback:([%z\x01-\xFF]-)citizen:")
+        local ferr = ""
+
+        for file, line, varName in err:gmatch("(@.-):(%d+):%s*.-%s*'([^']+)'") do
+            if file and line and varName then
+                -- double \ in \\n since when writing to preprocessed file will be converted to a single \
+                ferr = ferr .. string.format("\\n^3> %s^7 (^5%s^7:%s)", varName, file, line)
+            end
+        end
+
+        error(msg .. ferr, lvl+1)
+    end
+end ]]
+
 -- Type override (allow custom types)
 if not _type then
     _type = type -- we preserve the original "type" function
