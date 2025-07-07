@@ -179,7 +179,11 @@ if not _leap_internal_deepcopy then
                     copy[k] = nil
                 else
                     if t == "table" then
-                        copy[k] = _leap_internal_deepcopy(v, seen, _filter, skipFunctions)
+                        if v.__type ~= nil then
+                            copy[k] = leap.serialize(v, seen)
+                        else
+                            copy[k] = _leap_internal_deepcopy(v, seen, _filter, skipFunctions)
+                        end
                     else
                         copy[k] = v
                     end
