@@ -207,10 +207,10 @@ if not _leap_internal_classBuilder then
                                     local val = v
     
                                     if vtype == "table" then
-                                        local mt = getmetatable(v)
-    
-                                        if not mt or not mt.__tostring then
-                                            val = json.encode(v)
+                                        if v.__type then
+                                            val = "<"..(v.__type)..":"..(("%p"):format(v))..">"
+                                        else
+                                            val = tostring(v)
                                         end
                                     end
                                     
