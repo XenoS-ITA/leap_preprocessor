@@ -16,14 +16,26 @@ if not leap.deserialize then
         local dataType = _type(data)
         if dataType ~= "table" or not data.__type then
             if dataType == "table" then -- tables can still contains leap serialized objects
-                local clone = {}
-                visited[data] = clone
-
-                for k, v in pairs(data) do
-                    clone[k] = leap.deserialize(v, visited)
+                if type(data.x) == "number" and type(data.y) == "number" then -- Try to hydrate vectors
+                    if type(data.z) == "number" then
+                        if type(data.w) == "number" then
+                            return vector4(data.x, data.y, data.z, data.w)
+                        else
+                            return vector3(data.x, data.y, data.z)
+                        end
+                    else
+                        return vector2(data.x, data.y)
+                    end
+                else
+                    local clone = {}
+                    visited[data] = clone
+    
+                    for k, v in pairs(data) do
+                        clone[k] = leap.deserialize(v, visited)
+                    end
+    
+                    return clone
                 end
-
-                return clone
             else -- primitive
                 return data
             end
