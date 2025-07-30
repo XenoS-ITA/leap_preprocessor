@@ -111,10 +111,11 @@ if not _leap_internal_classBuilder then
         setmetatable(prototype, mt_proto)
         --#endregion
 
+        -- TODO: add deepcopy also of parents to prevent cross object reference issues in child classes
         local tableKeys = {}
         local i = 1
         for k, v in next, prototype do
-            if _type(v) == "table" and k:sub(1, 5) ~= "_leap" then
+            if _type(v) == "table" and k:sub(1, 5) ~= "_leap" and k:sub(1, 2) ~= "__" then
                 tableKeys[i] = k
                 i = i + 1
             end
@@ -123,6 +124,12 @@ if not _leap_internal_classBuilder then
         --#region Metatable
         local objMetatable = {
             __index = function(self, key)
+                if not key then return nil end
+
+                if key:sub(1,2) == "__" then -- Internal variables have direct access to reduce overhead
+                    return rawget(prototype, key)
+                end
+
                 local cache = getmetatable(prototype).__cache -- Use the cache saved in the main prototype
                 local proto = prototype
                 local var = proto[key]
