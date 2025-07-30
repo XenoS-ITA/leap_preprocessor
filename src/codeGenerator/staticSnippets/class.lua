@@ -301,7 +301,7 @@ if not _leap_internal_is_operator then
         end
 
         if _type(obj) ~= "table" then
-            error("leap.is_operator: #1 passed argument must be a class instance, but got ".._type(obj), 2)
+            return _type(obj) == type(_class)
         end
 
         if _type(_class) ~= "table" then
