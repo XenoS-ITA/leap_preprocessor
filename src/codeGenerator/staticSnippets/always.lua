@@ -124,7 +124,19 @@ if not skipSerialize then
     skipSerialize = function(class, ignoreList)
         if _type(class) ~= "table" then error("skipSerialize: #1 passed argument must be a class, but got "..type(class), 2) end
 
-        class.__prototype.__ignoreList = ignoreList
+        if not class.__prototype.__ignoreList then
+            class.__prototype.__ignoreList = {}
+        end
+
+        if _type(ignoreList) == "table" then
+            for k, v in pairs(ignoreList) do
+                class.__prototype.__ignoreList[v] = true
+            end
+        elseif _type(ignoreList) == "string" then
+            class.__prototype.__ignoreList[ignoreList] = true
+        else
+            error("skipSerialize: #2 passed argument must be a table or a string, but got "..type(ignoreList), 2)
+        end
     end
 end
 
