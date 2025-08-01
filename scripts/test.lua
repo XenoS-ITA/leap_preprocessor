@@ -149,6 +149,15 @@ for k, v in pairs(tab) do
     if v < 5 then
         continue
     end
+    if v > 50 then
+        continue
+    end
+
+    for i=1, 5 do
+        if i == 3 then
+            continue
+        end
+    end
 
     print("${k} = ${v}")
 end

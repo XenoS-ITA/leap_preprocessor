@@ -22,6 +22,14 @@ class Injecter {
         this.injects = this.injects.filter(inject => inject.func !== func)        
     }
 
+    isFunctionInjected(func: string) {
+        return this.injects.some(inject => inject.func === func)
+    }
+
+    isFunctionInjectedIncludes(func: string, code: string) {
+        return this.injects.some(inject => inject.func === func && inject.code.includes(code))
+    }
+
     // Inject the "code" in the code manager
     injectIfNeeded(code: Code, funcname?: string) {
         funcname = funcname || Utils.getCallerName(2);

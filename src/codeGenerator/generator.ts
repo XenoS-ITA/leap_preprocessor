@@ -1381,8 +1381,13 @@ class CodeGenerator extends LuaListener {
     }
 
     convertContinue = (node: TerminalNode): string => {
-        // Inject the continue label at the end of the current for type
-        this.injecter.inNext(`convertFor_${this.forDepth}`, ` ::continue_${this.forDepth}::`)
+        const func = `convertFor_${this.forDepth}`
+        const code = ` ::continue_${this.forDepth}::`
+
+        // Inject the continue label at the end of the current for type (if not already injected)
+        if (!this.injecter.isFunctionInjectedIncludes(func, code)) {
+            this.injecter.inNext(func, code)
+        }
 
         return `goto continue_${this.forDepth}`;
     }
