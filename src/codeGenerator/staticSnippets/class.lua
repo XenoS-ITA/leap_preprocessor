@@ -22,14 +22,24 @@ if not _leap_internal_classBuilder then
         setmetatable(prototype, mt_proto)
         --#endregion
 
-        -- TODO: add deepcopy also of parents to prevent cross object reference issues in child classes
+        -- Save all tableKeys (also of parent classes!)
+        local proto = prototype
         local tableKeys = {}
-        local i = 1
-        for k, v in next, prototype do
-            if _type(v) == "table" and k:sub(1, 5) ~= "_leap" and k:sub(1, 2) ~= "__" then
-                tableKeys[i] = k
-                i = i + 1
+
+        while proto do
+            for k, v in next, proto do
+                if not tableKeys[k] then
+                    if _type(v) == "table" and k:sub(1, 5) ~= "_leap" and k:sub(1, 2) ~= "__" then
+                        tableKeys[k] = proto
+                    end
+                end
             end
+
+            if not proto.__parent then
+                break
+            end
+
+            proto = proto.__parent.__prototype
         end
 
         --#region Metatable
@@ -129,9 +139,8 @@ if not _leap_internal_classBuilder then
                 local obj = {__type = self.__type}
 
                 -- deepcopy all prototype tables to prevent cross object reference issues
-                for j = 1, #tableKeys do
-                    local key = tableKeys[j]
-                    obj[key] = _leap_internal_deepcopy(self.__prototype[key])
+                for key, sourceProto in pairs(tableKeys) do
+                    obj[key] = _leap_internal_deepcopy(sourceProto[key])
                 end
 
                 setmetatable(obj, objMetatable)
