@@ -218,3 +218,160 @@ class Test2 {
         print("adw")
     end
 }
+
+
+--- TEST self.super
+
+local MAX_DEPTH = 8
+
+local function enterDepth(self)
+    self._depth = (self._depth or 0) + 1
+    return self._depth <= MAX_DEPTH
+end
+
+local function exitDepth(self)
+    self._depth = self._depth - 1
+end
+
+class A {
+    constructor = function()
+        self.log = {}
+    end,
+
+    step = function()
+        print("A: step")
+        table.insert(self.log, "A:step")
+    end,
+
+    run = function()
+        print("A: run")
+        table.insert(self.log, "A:run")
+        self:step()
+    end,
+}
+
+class B extends A {
+    step = function()
+        print("B: step (before super)")
+        table.insert(self.log, "B:step:start")
+        self.super:step()
+        print("B: step (after super)")
+        table.insert(self.log, "B:step:end")
+    end,
+
+    run = function()
+        print("B: run")
+        table.insert(self.log, "B:run")
+        if math.random() > 0.2 then
+            self.super:run()
+        end
+    end,
+}
+
+class C extends B {
+    step = function()
+        print("C: step")
+        table.insert(self.log, "C:step")
+        if math.random() > 0.4 and enterDepth(self) then
+            print("C: also calling super:run")
+            self.super:run()
+            exitDepth(self)
+        end
+        self.super:step()
+    end,
+
+    run = function()
+        print("C: run")
+        table.insert(self.log, "C:run")
+        self:step()
+        if math.random() > 0.6 then
+            self.super:step()
+        end
+        table.insert(self.log, "C:run:end")
+    end,
+}
+
+class D extends C {
+    step = function()
+        print("D: step (start)")
+        table.insert(self.log, "D:step:start")
+        if math.random() > 0.5 and enterDepth(self) then
+            print("D: step calls self:run")
+            self:run()
+            exitDepth(self)
+        end
+        self.super:step()
+        print("D: step (end)")
+        table.insert(self.log, "D:step:end")
+    end,
+
+    run = function()
+        print("D: run")
+        table.insert(self.log, "D:run")
+        self.super:run()
+        if math.random() > 0.7 and enterDepth(self) then
+            self:step()
+            exitDepth(self)
+        end
+        table.insert(self.log, "D:run:end")
+    end,
+}
+
+class E extends D {
+    step = function()
+        print("E: step")
+        table.insert(self.log, "E:step")
+        if math.random() > 0.3 then
+            self.super:step()
+        end
+    end,
+
+    run = function()
+        print("E: run (start)")
+        table.insert(self.log, "E:run:start")
+        self:step()
+        self.super:run()
+        print("E: run (end)")
+        table.insert(self.log, "E:run:end")
+    end,
+}
+
+class F extends E {
+    step = function()
+        print("F: step")
+        table.insert(self.log, "F:step")
+        if math.random() > 0.1 then
+            self.super:step()
+        end
+        if math.random() > 0.8 and enterDepth(self) then
+            self:run()
+            exitDepth(self)
+        end
+    end,
+
+    run = function()
+        print("F: run")
+        table.insert(self.log, "F:run")
+        if math.random() > 0.2 then
+            self.super:run()
+        end
+        self:step()
+        if math.random() > 0.7 then
+            self.super:step()
+        end
+        print("F: run (end)")
+        table.insert(self.log, "F:run:end")
+    end,
+}
+
+
+
+math.randomseed(99) -- Seed deterministico per test coerente
+
+local f = F()
+f:run()
+
+print("\nLog:")
+for i, entry in ipairs(f.log) do
+    print(i, entry)
+end

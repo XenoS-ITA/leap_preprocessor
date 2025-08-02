@@ -1,93 +1,4 @@
 if not _leap_internal_classBuilder then
-    local getCurrentPrototype = function(obj)
-        local class = obj.__stack[#obj.__stack] -- getCurrentClass
-
-        --print("Current level", #obj.__stack, class?.__type)
-        return class and class.__prototype
-    end
-
-    local getCurrentType = function(obj)
-        local class = obj.__stack[#obj.__stack] -- getCurrentClass
-        return class and class.__type
-    end
-
-    local NIL_PARENT = {}
-    local pushParentOfPrototype = function(obj, proto)
-        if not proto.__parent then
-            --print("Adding nil parent")
-            table.insert(obj.__stack, NIL_PARENT)
-        else
-            --print("Adding parent", proto.__parent.__type)
-            table.insert(obj.__stack, proto.__parent)
-        end
-    end
-
-    local popParent = function(obj)
-        local parent = table.remove(obj.__stack)
-        --print("Popping parent", parent and parent.__type)
-    end
-
-    --[[ local debugStack = function(obj)
-        print("STACK:")
-        for i = 1, #obj.__stack do
-            print(i, obj.__stack[i].__type)
-        end
-        print("")
-    end ]]
-
-    local mt_super = {
-        __index = function(self, key)
-            if key == "__type" then
-                return getCurrentType(self.obj)
-            else
-                local proto = getCurrentPrototype(self.obj)
-                --print("Super searching for", key, "in", getCurrentClass(self.obj))
-    
-                -- No parent
-                if not proto or next(proto) == nil then
-                    return nil
-                end
-    
-                local var = proto[key]
-                
-                if type(var) == "function" then
-                    local sig = leap.fsignature(var)
-
-                    return leap.registerfunc(function(_, ...)
-                        pushParentOfPrototype(self.obj, proto)
-                            local ret = table.pack(pcall(var, self.obj, ...))
-                        popParent(self.obj)
-
-                        if not ret[1] then
-                            local msg = tostring(ret[2])
-                        
-                            if msg:sub(1,1) == "@" then
-                                error(msg, 0)
-                            else
-                                error(msg, 2) -- rethrow, shift error 1 stack level up
-                            end
-                        end
-
-                        return table.unpack(ret, 2, ret.n)
-                    end, sig)
-                else
-                    return var
-                end
-            end
-        end,
-        __call = function(self, ...)
-            local constructor = self.constructor
-
-            if constructor then
-                return constructor(...)
-            end
-        end
-    }
-
-    function _leap_internal_class_makeSuper(obj)
-        return setmetatable({obj = obj}, mt_super)
-    end
-
     _leap_internal_classBuilder = function(name, prototype, baseClass)
         prototype._leap_internal_decorators = {}
 
@@ -132,16 +43,17 @@ if not _leap_internal_classBuilder then
 
                 local cache = getmetatable(prototype).__cache -- Use the cache saved in the main prototype
                 local proto = prototype
-                local var = proto[key]
 
                 if not cache[key] then
                     --print("Searching for var", self.__type, key)
 
                     -- Search for var in all hierarchy
                     while proto do
-                        if proto[key] ~= nil then -- Found var
+                        if rawget(proto, key) ~= nil then -- Found var
                             --print("Found var", self.__type, key)
-                            var = proto[key]
+
+                            -- Just store the proto where we found it, so we can access it later
+                            cache[key] = proto
                             break
                         end
 
@@ -152,47 +64,12 @@ if not _leap_internal_classBuilder then
 
                         proto = proto.__parent.__prototype
                     end
-                    
-                    if type(var) == "function" then
-                        local sig = leap.fsignature(var)
-
-                        -- Wrap the function with stack management
-                        cache[key] = leap.registerfunc(function(_, ...)
-                            if not _ then error("leap: You need to pass self when calling a class method", 2) end
-
-                            pushParentOfPrototype(_, proto)
-                                local ret = table.pack(pcall(var, _, ...))
-                            popParent(_)
-
-                            if not ret[1] then
-                                local msg = tostring(ret[2])
-                            
-                                if msg:sub(1,1) == "@" then
-                                    error(msg, 0)
-                                else
-                                    error(msg, 2) -- rethrow, shift error 1 stack level up
-                                end
-                            end
-
-                            return table.unpack(ret, 2, ret.n)
-                        end, sig)
-                    else
-                        -- Just store the proto where we found it, so we can access it later
-                        cache[key] = {
-                            proto = proto
-                        }
-                    end
                 else
                     --print("Found var in cache", self.__type, key)
                 end
 
-                -- If cached reuturn that
-                if type(cache[key]) == "function" then
-                    return cache[key]
-                else
-                    local proto = cache[key].proto
-                    return proto[key]
-                end
+                local proto = cache[key] -- Use the cached prototype and return the value from it
+                return proto[key]
             end,
             __gc = function(self)
                 if self.destructor then
@@ -249,7 +126,7 @@ if not _leap_internal_classBuilder then
             end,
             __call = function(self, ...)
                 --#region Object Instantiation
-                local obj = {__type = self.__type, __stack = {}}
+                local obj = {__type = self.__type}
 
                 -- deepcopy all prototype tables to prevent cross object reference issues
                 for j = 1, #tableKeys do
@@ -259,11 +136,6 @@ if not _leap_internal_classBuilder then
 
                 setmetatable(obj, objMetatable)
                 --#endregion
-
-                local parentclass = self.__prototype.__parent
-                if parentclass then
-                    obj.super = _leap_internal_class_makeSuper(obj)
-                end
 
                 --#region Decorators Application
                 for _, decorator in pairs(obj._leap_internal_decorators) do
@@ -279,7 +151,10 @@ if not _leap_internal_classBuilder then
                 if not self.__skipNextConstructor then
                     local ctor = obj.constructor
                     if ctor then
-                        ctor(obj, ...)
+                        local success, err = pcall(ctor, obj, ...)
+                        if not success then
+                            error(err, 2)
+                        end
                     end
                 end
                 -- #endregion

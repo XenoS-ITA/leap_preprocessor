@@ -22,7 +22,12 @@ class CodeGenerator extends LuaListener {
     firstStat: boolean = true
     injecter: Injecter
     currentFunctionParList: ParlistContext
+
     insideClass: string;
+    insideClassExtends: string;
+
+    thisFunctionCallIsWithSuper: boolean;
+    
     insideTryCatch: boolean;
     
     assignment: boolean;
@@ -462,7 +467,8 @@ class CodeGenerator extends LuaListener {
         | exp ('&' | '|' | '~' | '<<' | '>>') exp
     */
     enterPrefixexp = (ctx: PrefixexpContext | FunctioncallContext): string => {
-        let code = new Code();
+        const code = new Code();
+        const member_list = ctx.indexed_member_list()
 
         if (ctx.functioncall()) {
             code.add(ctx.functioncall(), this.enterFunctioncall);
@@ -471,30 +477,70 @@ class CodeGenerator extends LuaListener {
             code.add(ctx.exp(), this.enterExp);
             code.add(")");
         } else {
-            code.add(ctx.identifier(0));
+            const baseIdentifier = this.enterIdentifier(ctx.identifier(0))
+            const firstMemberName = member_list[0]?.identifier()?.getText() || "";
+            const isSelfSuperReference = baseIdentifier === "self" && firstMemberName === "super";
+
+            if (isSelfSuperReference) {
+                member_list.shift()// Remove "super" from the member list
+                code.add(`${this.insideClassExtends}.__prototype`)
+
+                this.thisFunctionCallIsWithSuper = true
+            } else {
+                code.add(baseIdentifier);
+            }
         }
 
-        code.add(ctx.indexed_member_list(), nodes => Utils.convertNodes(nodes as ParserRuleContext[], this.enterIndexed_member, null) );
+        code.add(member_list, nodes => 
+            Utils.convertNodes(nodes as ParserRuleContext[], this.enterIndexed_member, null)
+        );
 
         return code.get()
     };
 
     enterFunctioncall = (ctx: FunctioncallContext): string => {
-        let code = new Code()
+        const code = new Code()
+        const identifiers = ctx.identifier_list()
+        const isColonCall = ctx.COL() !== null
 
-        code.add(ctx, this.enterPrefixexp)
+        const isSuperConstructorCall = 
+            isColonCall &&
+            identifiers?.length == 2 &&
+            identifiers[0].getText() == "self" &&
+            identifiers[1].getText() == "super";
 
-        if (ctx.COL()) {
-            code.add(ctx.COL())
+        if (isSuperConstructorCall) {
+            // Replace self:super() with EXTENDING_CLASS.__prototype.constructor()
+            code.add(`${this.insideClassExtends}.__prototype.constructor`)
+            this.thisFunctionCallIsWithSuper = true
+        } else {
+            code.add(ctx, this.enterPrefixexp)
+            
+            if (isColonCall) {
+                const methodName = identifiers[identifiers.length-1]
 
-            const nameList = ctx.identifier_list()
-            code.add(nameList[nameList.length-1])
+                code.add(this.thisFunctionCallIsWithSuper ? "." : ctx.COL())                
+                code.add(methodName)
+            } else {
+                const memberList = ctx.indexed_member_list()
+                const isDirectSuperConstructorCall =
+                    memberList?.length === 1 &&
+                    memberList[0].identifier()?.getText() === "super";
+                    
+                if (isDirectSuperConstructorCall) {
+                    // Add .constructor() as function call (so that it doesnt call the prototype directly)
+                    code.add(".constructor")
+                }
+
+                this.thisFunctionCallIsWithSuper = false
+            }
         }
 
         const id = this.addFunctionName(code.get())
         code.add(ctx.args(), this.enterArgs)
         this.removeFunctionName(id)
 
+        this.thisFunctionCallIsWithSuper = false
         return code.get()
     }
 
@@ -545,6 +591,15 @@ class CodeGenerator extends LuaListener {
             const code = new Code();
             const argslist = ctx.argumentlist()
             code.add(ctx.OP())
+
+            // If the call is self.super lets inject self as first parameter
+            if (this.thisFunctionCallIsWithSuper) {
+                code.add("self")
+
+                if (argslist && argslist.argument_list()?.length > 0) {
+                    code.add(",")
+                }
+            }
 
             if (argslist) {
                 const id = argslist.start.start // We use the tokenIndex as id
@@ -670,8 +725,12 @@ class CodeGenerator extends LuaListener {
         code.add(",")
 
         this.insideClass = name;
+        if (ctx.EXTENDS()) this.insideClassExtends = this.enterIdentifier(ctx.identifier(1));
+
         code.add(ctx.tableconstructor(), this.enterTableconstructor)
+
         this.insideClass = null;
+        if (ctx.EXTENDS()) this.insideClassExtends = null;
 
         if (ctx.EXTENDS()) {
             code.add(", ")
