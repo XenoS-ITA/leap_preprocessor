@@ -152,6 +152,10 @@ if not _leap_internal_classBuilder then
                     local wrapper = function(...) return original(obj, ...) end
                     leap.registerfunc(wrapper, leap.fsignature(original))
 
+                    if not _G[decorator.decoratorName] then
+                        error("Decorator "..decorator.decoratorName.." does not exist", 2)
+                    end
+
                     obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
                 end
                 --#endregion
