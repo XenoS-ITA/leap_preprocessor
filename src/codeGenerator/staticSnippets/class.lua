@@ -127,6 +127,22 @@ if not _leap_internal_classBuilder then
         --#endregion
 
         _G[name] = setmetatable({__type = name, __prototype = prototype}, {
+            __index = function(self, k)
+                local ret = objMetatable.__index(self, k)
+
+                -- Skip self if it is a function (also if it called as method, to prevent accessing the class itself)
+                if type(ret) == "function" then
+                    return function(a, ...) 
+                        if _type(a) == "table" and a.__type == self.__type then 
+                            return ret(nil, ...)
+                        else 
+                            return ret(a, ...)
+                        end
+                    end
+                else
+                    return ret
+                end
+            end,
             __newindex = function(self, k, v)
                 if k:sub(1, 2) == "__" then -- Allow internal modfications
                     rawset(self, k, v)
