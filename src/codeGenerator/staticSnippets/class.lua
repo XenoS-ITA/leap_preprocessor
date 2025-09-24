@@ -163,16 +163,29 @@ if not _leap_internal_classBuilder then
                 --#endregion
 
                 --#region Decorators Application
-                for _, decorator in pairs(obj._leap_internal_decorators) do
-                    local original = obj[decorator.name]
-                    local wrapper = function(...) return original(obj, ...) end
-                    leap.registerfunc(wrapper, leap.fsignature(original))
+                local proto = prototype
 
-                    if not _G[decorator.decoratorName] then
-                        error("Decorator "..decorator.decoratorName.." does not exist", 2)
+                -- Loop all hierarchy, and apply func decorators to all functions, also decorators of parent classes defined functions!
+                while proto do
+                    if proto._leap_internal_decorators then
+                        for _, decorator in pairs(proto._leap_internal_decorators) do
+                            local original = obj[decorator.name]
+                            local wrapper = function(...) return original(obj, ...) end
+                            leap.registerfunc(wrapper, leap.fsignature(original))
+
+                            if not _G[decorator.decoratorName] then
+                                error("Decorator "..decorator.decoratorName.." does not exist", 2)
+                            end
+
+                            obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
+                        end
                     end
 
-                    obj[decorator.name] = _G[decorator.decoratorName](obj, wrapper, table.unpack(decorator.args)) or original
+                    if not proto.__parent then
+                        break
+                    end
+
+                    proto = proto.__parent.__prototype
                 end
                 --#endregion
                 
