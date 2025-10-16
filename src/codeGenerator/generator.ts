@@ -832,6 +832,10 @@ class CodeGenerator extends LuaListener {
                 code.add(ctx.DDD())
             }
         } else if (ctx.DDD()) {
+            if (this.insideClass) {
+                code.add("self, ")
+            }
+
             code.add(ctx.DDD())
         } else {
             // cfxlua (class)
