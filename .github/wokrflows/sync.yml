@@ -1,0 +1,74 @@
+name: Build and sync leap.js
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'dist/**'
+      
+permissions:
+  contents: write
+
+jobs:
+  build-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit build changes in source repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No source repo changes to commit"
+          else
+            git commit -m "build: update leap.js"
+            git push
+          fi
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: utility-library/leap
+          token: ${{ secrets.LEAP_REPO_TOKEN }}
+          path: leap-repo
+
+      - name: Copy built file to target repo
+        run: |
+          cp dist/leap.js leap-repo/functions/leap.js
+
+      - name: Commit and push target repo changes
+        working-directory: leap-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add functions/leap.js
+
+          if git diff --cached --quiet; then
+            echo "No target repo changes to commit"
+            exit 0
+          fi
+
+          git commit -m "update: functions/leap.js from preprocessor repo"
+          git push
