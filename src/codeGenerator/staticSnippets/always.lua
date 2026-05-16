@@ -109,7 +109,7 @@ if not leap.serialize then
 
         if data.__ignoreList then
             for k, v in pairs(data.__ignoreList) do
-                filterSet[v] = true
+                filterSet[k] = v
             end
         end
 
@@ -203,7 +203,7 @@ if not _leap_internal_deepcopy then
                     copy[k] = nil
                 else
                     if t == "table" then
-                        if v.__type ~= nil then
+                        if v.__type ~= nil and getmetatable(v) then
                             copy[k] = leap.serialize(v, seen)
                         else
                             copy[k] = _leap_internal_deepcopy(v, seen, _filter, skipFunctions)
