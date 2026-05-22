@@ -67,56 +67,118 @@ end
 
 
 if not leap.serialize then
-    leap.serialize = function(data, visited)
+    local _leap_serialize_active = {}
+    local _leap_serialize_stack = {}
+
+    local DEFAULT_FILTER_SET = {
+        __stack = true,
+        __parent = true,
+        super = true,
+    }
+
+    local function _leap_serialize_format_path(stack, startIndex, key, obj)
+        local parts = {}
+
+        for i = startIndex, #stack do
+            local frame = stack[i]
+            parts[#parts + 1] = frame.key .. "<" .. type(frame.obj) .. ">"
+        end
+
+        parts[#parts + 1] = key .. "<" .. type(obj) .. ">"
+        return table.concat(parts, ".")
+    end
+
+    local function _leap_serialize_push(obj, key)
+        local index = _leap_serialize_active[obj]
+
+        if index then
+            error("leap.serialize: circular serialization loop detected: ".._leap_serialize_format_path(_leap_serialize_stack, index, key, obj), 0)
+        end
+
+        local stackIndex = #_leap_serialize_stack + 1
+        _leap_serialize_stack[stackIndex] = {
+            obj = obj,
+            key = key,
+        }
+
+        _leap_serialize_active[obj] = stackIndex
+    end
+
+    local function _leap_serialize_pop(obj)
+        _leap_serialize_active[obj] = nil
+        _leap_serialize_stack[#_leap_serialize_stack] = nil
+    end
+
+    local function _leap_serialize_filter_set(data)
+        local ignoreList = data.__ignoreList
+
+        if not ignoreList then
+            return DEFAULT_FILTER_SET
+        end
+
+        local filterSet = table.clone(DEFAULT_FILTER_SET)
+
+        for k, v in pairs(ignoreList) do
+            filterSet[k] = v
+        end
+
+        return filterSet
+    end
+
+    leap.serialize = function(data, visited, key)
         visited = visited or {}
+        key = key or "root"
 
         local dataType = _type(data)
-        if dataType ~= "table" then -- primitive
+
+        if dataType ~= "table" then
             return data
         end
 
-        if visited[data] then
-            return visited[data]
+        local existing = visited[data]
+        if existing then
+            return existing
         end
 
-        -- custom serialize method
-        if data.serialize then
-            local serialized = data:serialize()
-            if not serialized then
-                return nil
+        _leap_serialize_push(data, key)
+
+        local ok, result = pcall(function()
+            if data.serialize then
+                local serialized = {}
+                visited[data] = serialized
+
+                local raw = data.serialize(data)
+
+                if raw == nil then
+                    visited[data] = nil
+                    return nil
+                end
+
+                if type(raw) ~= "table" then
+                    error("leap.serialize: custom serialize method must return a table", 2)
+                end
+
+                for k, v in pairs(raw) do
+                    serialized[k] = leap.serialize(v, visited, k)
+                end
+
+                serialized.__type = data.__type
+                return serialized
             end
 
-            if type(serialized) ~= "table" then
-                error("leap.serialize: custom serialize method must return a table", 2)
-            end
+            local clone = _leap_internal_deepcopy(data, visited, _leap_serialize_filter_set(data), true)
 
-            visited[data] = serialized
+            visited[data] = clone
+            return clone
+        end)
 
-            -- serialized data can still contains objects to serialize
-            for k, v in pairs(serialized) do
-                serialized[k] = leap.serialize(v, visited)
-            end
+        _leap_serialize_pop(data)
 
-            serialized.__type = data.__type
-            return serialized
+        if not ok then
+            error(result, 2)
         end
 
-        local filterSet = {
-            __stack = true,
-            __parent = true,
-            super = true
-        }
-
-        if data.__ignoreList then
-            for k, v in pairs(data.__ignoreList) do
-                filterSet[k] = v
-            end
-        end
-
-        local clone = _leap_internal_deepcopy(data, visited, filterSet, true)
-        visited[data] = clone
-
-        return clone
+        return result
     end
 end
 
@@ -204,7 +266,7 @@ if not _leap_internal_deepcopy then
                 else
                     if t == "table" then
                         if v.__type ~= nil and getmetatable(v) then
-                            copy[k] = leap.serialize(v, seen)
+                            copy[k] = leap.serialize(v, seen, k)
                         else
                             copy[k] = _leap_internal_deepcopy(v, seen, _filter, skipFunctions)
                         end
