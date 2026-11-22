@@ -115,12 +115,12 @@ exp
     | exp ('*' | '/' | '%' | '//') exp
     | exp ('+' | '-') exp
     | <assoc = right> exp ('..') exp
-    | exp ('<' | '>' | '<=' | '>=' | '~=' | '!=' | '==') exp
+    // `in` / `not in` share the comparison level (like Lua's `==`), so they bind tighter than `and` / `or`:
+    // `a in t1 or b in t2` is `(a in t1) or (b in t2)`. Alternative order sets precedence in ANTLR (earlier = tighter).
+    | exp ('<' | '>' | '<=' | '>=' | '~=' | '!=' | '==' | 'in' | 'not' 'in') exp
     | exp ('and' | 'or') exp
     | exp ('&' | '|' | '~' | '<<' | '>>') exp
     | isop
-    | exp 'in' exp
-    | exp 'not' 'in' exp
     | exp '?' exp ':' exp
     ;
 
