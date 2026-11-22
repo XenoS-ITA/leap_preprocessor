@@ -7,20 +7,11 @@ if not _leap_internal_classBuilder then
             error("ExtendingNotDefined: "..name.." tried to extend a class that is not defined", 2)
         end
 
+        -- Prototypes are chained (child -> parent), so inherited lookups run in C and always see later changes
         if baseClass.__prototype then
             prototype.__parent = baseClass
-        end 
-
-        --#region Prototype metatable to handle cache
-        local mt_proto = {
-            __cache = {},
-            __newindex = function (t, k, v)
-                rawset(t, k, v)
-                getmetatable(t).__cache[k] = nil -- Clear cache
-            end
-        }
-        setmetatable(prototype, mt_proto)
-        --#endregion
+            setmetatable(prototype, { __index = baseClass.__prototype })
+        end
 
         -- Save all tableKeys (also of parent classes!)
         local proto = prototype
@@ -42,50 +33,20 @@ if not _leap_internal_classBuilder then
             proto = proto.__parent.__prototype
         end
 
+        -- Flat arrays for the instantiation loop (the owning prototype's value is still read live at every instantiation)
+        local fieldKeys, fieldProtos, fieldCount = {}, {}, 0
+        for k, owner in next, tableKeys do
+            fieldCount = fieldCount + 1
+            fieldKeys[fieldCount] = k
+            fieldProtos[fieldCount] = owner
+        end
+
+        local copyField = _leap_internal_copyfield
+        local createTable = table.create
+
         --#region Metatable
         local objMetatable = {
-            __index = function(self, key)
-                if not key then return nil end
-
-                if key:sub(1,2) == "__" then -- Internal variables have direct access to reduce overhead
-                    return rawget(prototype, key)
-                end
-
-                local cache = getmetatable(prototype).__cache -- Use the cache saved in the main prototype
-                local proto = prototype
-
-                if not cache[key] then
-                    --print("Searching for var", self.__type, key)
-
-                    -- Search for var in all hierarchy
-                    while proto do
-                        if rawget(proto, key) ~= nil then -- Found var
-                            --print("Found var", self.__type, key)
-
-                            -- Just store the proto where we found it, so we can access it later
-                            cache[key] = proto
-                            break
-                        end
-
-                        if not proto.__parent then -- No more parent and still not found, stop search and return nil
-                            --print("No more parent and still not found, stop search and return nil", self.__type, key)
-                            return nil
-                        end
-
-                        proto = proto.__parent.__prototype
-                    end
-                else
-                    --print("Found var in cache", self.__type, key)
-                end
-
-                local proto = cache[key] -- Use the cached prototype and return the value from it
-                return proto[key]
-            end,
-            __gc = function(self)
-                if self.destructor then
-                    self:destructor()
-                end
-            end,
+            __index = prototype,
             __tostring = function(self)
                 if self.toString then
                     return self:toString()
@@ -124,11 +85,24 @@ if not _leap_internal_classBuilder then
                 end
             end
         }
+
+        -- Lua only reads __gc at setmetatable time, so instances with a destructor need their own metatable
+        local gcMetatable = {}
+        for k, v in next, objMetatable do
+            gcMetatable[k] = v
+        end
+
+        gcMetatable.__gc = function(self)
+            local destructor = self.destructor
+            if destructor then
+                destructor(self)
+            end
+        end
         --#endregion
 
         _G[name] = setmetatable({__type = name, __prototype = prototype}, {
             __index = function(self, k)
-                local ret = objMetatable.__index(self, k)
+                local ret = prototype[k]
 
                 -- Skip self if it is a function (also if it called as method, to prevent accessing the class itself)
                 if type(ret) == "function" then
@@ -152,14 +126,25 @@ if not _leap_internal_classBuilder then
             end,
             __call = function(self, ...)
                 --#region Object Instantiation
-                local obj = {__type = self.__type}
+                local obj
 
-                -- deepcopy all prototype tables to prevent cross object reference issues
-                for key, sourceProto in pairs(tableKeys) do
-                    obj[key] = _leap_internal_deepcopy(sourceProto[key])
+                -- Presize the hash part so adding the copied fields does not rehash the object (cfx only)
+                if createTable and fieldCount > 0 then
+                    obj = createTable(0, fieldCount + 1)
+                    obj.__type = self.__type
+                else
+                    obj = {__type = self.__type}
                 end
 
-                setmetatable(obj, objMetatable)
+                -- deepcopy all prototype tables to prevent cross object reference issues
+                for i = 1, fieldCount do
+                    local key = fieldKeys[i]
+                    obj[key] = copyField(fieldProtos[i][key])
+                end
+
+                local hasGc = prototype.destructor ~= nil
+
+                setmetatable(obj, hasGc and gcMetatable or objMetatable)
                 --#endregion
 
                 --#region Decorators Application
@@ -200,6 +185,11 @@ if not _leap_internal_classBuilder then
                     end
                 end
                 -- #endregion
+
+                -- The constructor may have assigned self.destructor
+                if not hasGc and rawget(obj, "destructor") then
+                    setmetatable(obj, gcMetatable)
+                end
 
                 self.__skipNextConstructor = nil
                 return obj

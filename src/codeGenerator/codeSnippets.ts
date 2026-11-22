@@ -75,24 +75,65 @@ namespace CodeSnippets {
         return codeToInject
     }
 
-    export function functionIntrospection(functionName: string, injectBody, injectArgs, functionReturn) {
+    const plainName = /^"([A-Za-z_][A-Za-z0-9_]*)"$/
+    const plainIdentifier = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+    // Metadata of a function ("info card") as sent to leap.registerfunc.
+    //
+    // Constant form (the usual case): one string literal "name|arg1,arg2|r" ("r" = has_return).
+    // A literal is a constant of the compiled chunk, so creating the closure allocates nothing for it;
+    // leap.fsignature decodes it lazily (see always.lua).
+    //
+    // A name computed at runtime (t[k] = function) is joined in front of the constant part: tostring(k).."|a,b|r".
+    //
+    // Table form (fallback): only for names/parameters that cannot be expressed that way.
+    export function functionInfo(functionName: string, args: string[], hasReturn: boolean) {
+        const name = functionName && functionName.length > 0 ? functionName : null
+        const literal = name ? plainName.exec(name) : null
+
+        if (args.every(arg => plainIdentifier.test(arg))) {
+            const rest = `|${args.join(",")}|${hasReturn ? "r" : ""}`
+
+            if (literal) {
+                return `"${literal[1]}${rest}"`
+            }
+
+            // Name computed at runtime (t[k] = function, { [expr] = function }): any expression that is not a plain
+            // "identifier" literal, joined in front of the constant part.
+            // Strings up to 40 chars are interned by Lua, so closures with the same name still share one string.
+            // tostring() keeps non-string keys from raising a concat error.
+            if (name) {
+                return `tostring(${name}).."${rest}"`
+            }
+        }
+
+        let info = "{args={"
+
+        for (const arg of args) {
+            info += `{name = "${arg}"},`
+        }
+
+        info += "},"
+
+        if (name) info += `name=${name},`
+        if (hasReturn) info += "has_return=true,"
+
+        return info + "}"
+    }
+
+    export function functionIntrospection(functionName: string, injectBody, getArgs: () => string[], functionReturn: () => boolean) {
         let code = new Code();
 
         code.add("leap.registerfunc(function")
             injectBody(code)
-            code.add(", {")
-            code.add("args={")
-                injectArgs(code)
-            code.add("},")
 
-            if (functionName && functionName.length > 0) {
-                code.add(`name=${functionName},`)
-            }
+            // Order matters: the body has to be generated before the args / return flag are known
+            const args = getArgs()
+            const hasReturn = !!functionReturn()
 
-            if (functionReturn()) {
-                code.add("has_return=true,")
-            }
-        code.add("})")
+            code.add(", ")
+            code.add(functionInfo(functionName, args, hasReturn))
+        code.add(")")
 
         return code.get()
     }

@@ -14,7 +14,6 @@ class Injecter {
     // Allow to inject code in the next execution of a function
     // Functions need to pass "this" to the code manager to be able to inject code
     inNext(func: string, code: string) {
-        //console.log("injectInNext", func)
         this.injects.push({ func, code })
     }
 
@@ -37,7 +36,6 @@ class Injecter {
         for (let i = 0; i < this.injects.length; i++) {
             const inject = this.injects[i];
             if (inject.func === funcname) {
-                //console.log("Injecting in " + funcname);
                 code.add(inject.code);
                 this.injects.splice(i, 1);
         
@@ -65,7 +63,6 @@ class Injecter {
         this.enableGlobalFeature("alwaysInjected")
 
         for (const name of this.features) {
-            //console.log("Injecting feature " + name)
             code.code = CodeSnippets[name]() + ";" + code.code
         }
     }

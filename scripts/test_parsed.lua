@@ -1,14 +1,14 @@
-if not leap then leap={}end;if not leap.deserialize then leap.deserialize=function(a,b)b=b or{}if b[a]then return b[a]end;local c=_type(a)if c~="table"or not a.__type then if c=="table"then if type(a.x)=="number"and type(a.y)=="number"then if type(a.z)=="number"then if type(a.w)=="number"then return vector4(a.x,a.y,a.z,a.w)else return vector3(a.x,a.y,a.z)end else return vector2(a.x,a.y)end else local d={}b[a]=d;for e,f in pairs(a)do d[e]=leap.deserialize(f,b)end;return d end else return a end end;local g=_G[a.__type]if not g then error("Class '"..a.__type.."' not found",2)end;g.__skipNextConstructor=true;local h=g()b[a]=h;if h.deserialize then h:deserialize(a)else for e,f in pairs(a)do if e~="__type"then h[e]=leap.deserialize(f,b)end end end;return h end end;if not leap.serialize then leap.serialize=function(a,b)b=b or{}local c=_type(a)if c~="table"then return a end;if b[a]then return b[a]end;if a.serialize then local i=a:serialize()if not i then return nil end;if type(i)~="table"then error("leap.serialize: custom serialize method must return a table",2)end;b[a]=i;for e,f in pairs(i)do i[e]=leap.serialize(f,b)end;i.__type=a.__type;return i end;local j={__stack=true,__parent=true,super=true}if a.__ignoreList then for e,f in pairs(a.__ignoreList)do j[f]=true end end;local d=_leap_internal_deepcopy(a,b,j,true)b[a]=d;return d end end;if not skipSerialize then skipSerialize=function(k,l)if _type(k)~="table"then error("skipSerialize: #1 passed argument must be a class, but got "..type(k),2)end;if not k.__prototype.__ignoreList then k.__prototype.__ignoreList={}end;if _type(l)=="table"then for e,f in pairs(l)do k.__prototype.__ignoreList[f]=true end elseif _type(l)=="string"then k.__prototype.__ignoreList[l]=true else error("skipSerialize: #2 passed argument must be a table or a string, but got "..type(l),2)end end end;if not leap.fsignature then leap.fsignature=function(m)if _type(m)~="function"then error("leap.fsignature: passed argument must be a function, but got ".._type(m),2)end;if not __leap__introspection then return nil end;return __leap__introspection[m]end end;if not leap.registerfunc then leap.registerfunc=function(m,n)if not __leap__introspection then __leap__introspection=setmetatable({},{__mode="k"})end;__leap__introspection[m]=n;return m end end;if not leap.minimal then leap.minimal=false end;if not table.clone then table.clone=function(o)local d={}for e,f in pairs(o)do d[e]=f end;return d end end;if not _leap_internal_deepcopy then _leap_internal_deepcopy=function(o,p,q,r)if _type(o)~="table"then return o end;p=p or{}if p[o]then return p[o]end;local s=table.clone(o)p[o]=s;for e,f in next,o do if q and q[e]then s[e]=nil else local t=_type(f)if t=="function"and r then s[e]=nil else if t=="table"then if f.__type~=nil then s[e]=leap.serialize(f,p)else s[e]=_leap_internal_deepcopy(f,p,q,r)end else s[e]=f end end end end;return s end end;if not _type then _type=type;type=function(u)local v=_type(u)if v=="table"and u.__type then return u.__type else return v end end end;if not __leap_call_kargs then __leap_call_kargs=function(a,b,...)local c={...}local d=leap.fsignature(a)if not d then error("leap: "..a.." cant accept kargs as it has no metadata (probably not processed by leap)",2)end;for e,f in pairs(b)do for g,h in pairs(d.args)do if h.name==e then if c[g]then local i=string.format("leap: argument '%s' for function '%s' was provided both positionally (%s) and as a keyword (%s)",e,d.name,tostring(c[g]),tostring(f))error(i,2)end;c[g]=f;break end end end;return table.unpack(c)end end;if not _leap_internal_using_operator then _leap_internal_using_operator=function(a,b,...)local c=a;a=_G[a]if type(a)~="string"then error("using operator expects a filter, got "..type(a),2)end;local d=b.ddd;b.ddd=nil;local e={...}local f,g=pcall(function()load(a,"@"..c,"t",setmetatable(b,{__index=_G}))()(table.unpack(e),d and table.unpack(d))end)if not f then error(g,2)end end end;if not _leap_internal_in_operator then _leap_internal_in_operator=function(a,b)local c=type(b)if c=="table"then if table.type(b)=="array"then for d,e in pairs(b)do if e==a then return true end end elseif table.type(b)=="hash"then for d,e in pairs(b)do if d==a then return true end end else for d,e in pairs(b)do if e==a or d==a then return true end end end elseif c=="string"then return b:find(a)else error("in operator: unsupported type "..c)end;return false end end;if not _leap_internal_classBuilder then _leap_internal_classBuilder=function(a,b,c)b._leap_internal_decorators={}if not c then error("ExtendingNotDefined: "..a.." tried to extend a class that is not defined",2)end;if c.__prototype then b.__parent=c end;local d={__cache={},__newindex=function(e,f,g)rawset(e,f,g)getmetatable(e).__cache[f]=nil end}setmetatable(b,d)local h=b;local i={}while h do for f,g in next,h do if not i[f]then if _type(g)=="table"and f:sub(1,5)~="_leap"and f:sub(1,2)~="__"then i[f]=h end end end;if not h.__parent then break end;h=h.__parent.__prototype end;local j={__index=function(self,k)if not k then return nil end;if k:sub(1,2)=="__"then return rawget(b,k)end;local l=getmetatable(b).__cache;local h=b;if not l[k]then while h do if rawget(h,k)~=nil then l[k]=h;break end;if not h.__parent then return nil end;h=h.__parent.__prototype end else end;local h=l[k]return h[k]end,__gc=function(self)if self.destructor then self:destructor()end end,__tostring=function(self)if self.toString then return self:toString()else local m=""if not leap.minimal then for f,g in pairs(self)do if f~="super"and f:sub(1,5)~="_leap"and f:sub(1,2)~="__"then local n=_type(g)if n~="function"then local o=g;if n=="table"then if g.__type then o="<"..g.__type..":"..("%p"):format(g)..">"else o=tostring(g)end end;if n=="string"then o='"'..g..'"'end;m=m..f..": "..tostring(o)..", "end end end;m=m:sub(1,-3)end;return"<"..self.__type..":"..("%p"):format(self).."> "..m end end}_G[a]=setmetatable({__type=a,__prototype=b},{__newindex=function(self,f,g)if f:sub(1,2)=="__"then rawset(self,f,g)else error("attempt to assign class property '"..f.."' directly, please instantiate the class before assigning any properties",2)end end,__call=function(self,...)local p={__type=self.__type}for k,q in pairs(i)do p[k]=_leap_internal_deepcopy(q[k])end;setmetatable(p,j)for r,s in pairs(p._leap_internal_decorators)do local t=p[s.name]local u=function(...)return t(p,...)end;leap.registerfunc(u,leap.fsignature(t))p[s.name]=_G[s.decoratorName](p,u,table.unpack(s.args))or t end;if not self.__skipNextConstructor then local v=p.constructor;if v then local w,x=pcall(v,p,...)if not w then error(x,2)end end end;self.__skipNextConstructor=nil;return p end})end;_leap_internal_classBuilder("Error",{constructor=function(self,y)self.message=y end,toString=function(self)return type(self)..": "..self.message end},{})end;if not _leap_internal_is_operator then _leap_internal_is_operator=function(p,z)if not p or not z then return false end;if _type(p)~="table"then return _type(p)==type(z)end;if _type(z)~="table"then error("leap.is_operator: #2 passed argument must be a class, but got ".._type(z),2)end;if p.__prototype then error("leap.is_operator: #1 passed argument must be a class instance, but got class",2)end;local A=p;while A and A.__type~=z.__type do if A.__parent or A.__prototype.__parent then A=A.__parent or A.__prototype.__parent else return false end end;return true end end;  
+if not leap then leap={}end;if not leap.deserialize then leap.deserialize=function(a,b)b=b or{}if b[a]then return b[a]end;local c=_type(a)if c~="table"or not a.__type then if c=="table"then if type(a.x)=="number"and type(a.y)=="number"then if type(a.z)=="number"then if type(a.w)=="number"then return vector4(a.x,a.y,a.z,a.w)else return vector3(a.x,a.y,a.z)end else return vector2(a.x,a.y)end else local d={}b[a]=d;for e,f in pairs(a)do d[e]=leap.deserialize(f,b)end;return d end else return a end end;local g=_G[a.__type]if not g then error("Class '"..a.__type.."' not found",2)end;g.__skipNextConstructor=true;local h=g()b[a]=h;if h.deserialize then h:deserialize(a)else for e,f in pairs(a)do if e~="__type"then h[e]=leap.deserialize(f,b)end end end;return h end end;if not leap.serialize then local i={}local j={}local k={__stack=true,__parent=true,super=true}local function l(m,n,o,h)local p={}for q=n,#m do local r=m[q]p[#p+1]=r.key.."<"..type(r.obj)..">"end;p[#p+1]=o.."<"..type(h)..">"return table.concat(p,".")end;local function s(h,o)local t=i[h]if t then error("leap.serialize: circular serialization loop detected: "..l(j,t,o,h),0)end;local u=#j+1;j[u]={obj=h,key=o}i[h]=u end;local function v(h)i[h]=nil;j[#j]=nil end;local function w(a)local x=a.__ignoreList;if not x then return k end;local y=table.clone(k)for e,f in pairs(x)do y[e]=f end;return y end;leap.serialize=function(a,b,o)b=b or{}o=o or"root"local c=_type(a)if c~="table"then return a end;local z=b[a]if z then return z end;s(a,o)local A,B=pcall(function()if a.serialize then local C={}b[a]=C;local D=a.serialize(a)if D==nil then b[a]=nil;return nil end;if type(D)~="table"then error("leap.serialize: custom serialize method must return a table",2)end;for e,f in pairs(D)do C[e]=leap.serialize(f,b,e)end;C.__type=a.__type;return C end;local d=_leap_internal_deepcopy(a,b,w(a),true)b[a]=d;return d end)v(a)if not A then error(B,2)end;return B end end;if not skipSerialize then skipSerialize=function(E,x)if _type(E)~="table"then error("skipSerialize: #1 passed argument must be a class, but got "..type(E),2)end;if not rawget(E.__prototype,"__ignoreList")then local F=E.__prototype.__ignoreList;E.__prototype.__ignoreList=F and table.clone(F)or{}end;if _type(x)=="table"then for e,f in pairs(x)do E.__prototype.__ignoreList[f]=true end elseif _type(x)=="string"then E.__prototype.__ignoreList[x]=true else error("skipSerialize: #2 passed argument must be a table or a string, but got "..type(x),2)end end end;if not _leap_internal_decodesig then local G={}_leap_internal_decodesig=function(H)local I=G[H]if I then return I end;local J,K,L=H:match("^(.*)|([^|]*)|([^|]*)$")local M={}for N in K:gmatch("[^,]+")do M[#M+1]={name=N}end;I={args=M,name=J}if L=="r"then I.has_return=true end;G[H]=I;return I end end;if not leap.fsignature then leap.fsignature=function(O)if _type(O)~="function"then error("leap.fsignature: passed argument must be a function, but got ".._type(O),2)end;if not __leap__introspection then return nil end;local P=__leap__introspection[O]if _type(P)=="string"then return _leap_internal_decodesig(P)end;return P end end;if not leap.registerfunc then leap.registerfunc=function(O,P)if not __leap__introspection then __leap__introspection=setmetatable({},{__mode="k"})end;__leap__introspection[O]=P;return O end end;if not leap.minimal then leap.minimal=false end;if not table.clone then table.clone=function(Q)local d={}for e,f in pairs(Q)do d[e]=f end;return d end end;if not _leap_internal_deepcopy then local _type=_type or type;local d=table.clone;_leap_internal_deepcopy=function(Q,R,S,T)if _type(Q)~="table"then return Q end;R=R or{}if R[Q]then return R[Q]end;local U=d(Q)R[Q]=U;for e,f in next,Q do if S and S[e]then U[e]=nil else local V=_type(f)if V=="table"then if f.__type~=nil and getmetatable(f)then U[e]=leap.serialize(f,R,e)else U[e]=_leap_internal_deepcopy(f,R,S,T)end elseif V=="function"and T then U[e]=nil end end end;return U end end;if not _leap_internal_copyfield then local _type=_type or type;local d=table.clone;_leap_internal_copyfield=function(Q)if _type(Q)~="table"then return Q end;local W=true;for X,f in next,Q do if _type(f)=="table"then return _leap_internal_deepcopy(Q)end;W=false end;if W then return{}end;return d(Q)end end;if not _type then _type=type;type=function(Y)local Z=_type(Y)if Z=="table"and Y.__type then return Y.__type else return Z end end end;if not __leap_call_kargs then __leap_call_kargs=function(a,b,...)local c={...}local d=leap.fsignature(a)if not d then error("leap: "..a.." cant accept kargs as it has no metadata (probably not processed by leap)",2)end;for e,f in pairs(b)do for g,h in pairs(d.args)do if h.name==e then if c[g]then local i=string.format("leap: argument '%s' for function '%s' was provided both positionally (%s) and as a keyword (%s)",e,d.name,tostring(c[g]),tostring(f))error(i,2)end;c[g]=f;break end end end;return table.unpack(c)end end;if not _leap_internal_using_operator then _leap_internal_using_operator=function(a,b,...)local c=a;a=_G[a]if type(a)~="string"then error("using operator expects a filter, got "..type(a),2)end;local d=b.ddd;b.ddd=nil;local e={...}local f,g=pcall(function()load(a,"@"..c,"t",setmetatable(b,{__index=_G}))()(table.unpack(e),d and table.unpack(d))end)if not f then error(g,2)end end end;if not _leap_internal_in_operator then _leap_internal_in_operator=function(a,b)local c=type(b)if c=="table"then if table.type(b)=="array"then for d,e in pairs(b)do if e==a then return true end end elseif table.type(b)=="hash"then for d,e in pairs(b)do if d==a then return true end end else for d,e in pairs(b)do if e==a or d==a then return true end end end elseif c=="string"then return b:find(a)else error("in operator: unsupported type "..c)end;return false end end;if not _leap_internal_classBuilder then _leap_internal_classBuilder=function(a,b,c)b._leap_internal_decorators={}if not c then error("ExtendingNotDefined: "..a.." tried to extend a class that is not defined",2)end;if c.__prototype then b.__parent=c;setmetatable(b,{__index=c.__prototype})end;local d=b;local e={}while d do for f,g in next,d do if not e[f]then if _type(g)=="table"and f:sub(1,5)~="_leap"and f:sub(1,2)~="__"then e[f]=d end end end;if not d.__parent then break end;d=d.__parent.__prototype end;local h,i,j={},{},0;for f,k in next,e do j=j+1;h[j]=f;i[j]=k end;local l=_leap_internal_copyfield;local m=table.create;local n={__index=b,__tostring=function(self)if self.toString then return self:toString()else local o=""if not leap.minimal then for f,g in pairs(self)do if f~="super"and f:sub(1,5)~="_leap"and f:sub(1,2)~="__"then local p=_type(g)if p~="function"then local q=g;if p=="table"then if g.__type then q="<"..g.__type..":"..("%p"):format(g)..">"else q=tostring(g)end end;if p=="string"then q='"'..g..'"'end;o=o..f..": "..tostring(q)..", "end end end;o=o:sub(1,-3)end;return"<"..self.__type..":"..("%p"):format(self).."> "..o end end}local r={}for f,g in next,n do r[f]=g end;r.__gc=function(self)local s=self.destructor;if s then s(self)end end;_G[a]=setmetatable({__type=a,__prototype=b},{__index=function(self,f)local t=b[f]if type(t)=="function"then return function(u,...)if _type(u)=="table"and u.__type==self.__type then return t(nil,...)else return t(u,...)end end else return t end end,__newindex=function(self,f,g)if f:sub(1,2)=="__"then rawset(self,f,g)else error("attempt to assign class property '"..f.."' directly, please instantiate the class before assigning any properties",2)end end,__call=function(self,...)local v;if m and j>0 then v=m(0,j+1)v.__type=self.__type else v={__type=self.__type}end;for w=1,j do local x=h[w]v[x]=l(i[w][x])end;local y=b.destructor~=nil;setmetatable(v,y and r or n)local d=b;while d do if d._leap_internal_decorators then for z,A in pairs(d._leap_internal_decorators)do local B=v[A.name]local C=function(...)return B(v,...)end;leap.registerfunc(C,leap.fsignature(B))if not _G[A.decoratorName]then error("Decorator "..A.decoratorName.." does not exist",2)end;v[A.name]=_G[A.decoratorName](v,C,table.unpack(A.args))or B end end;if not d.__parent then break end;d=d.__parent.__prototype end;if not self.__skipNextConstructor then local D=v.constructor;if D then local E,F=pcall(D,v,...)if not E then error(F,2)end end end;if not y and rawget(v,"destructor")then setmetatable(v,r)end;self.__skipNextConstructor=nil;return v end})end;_leap_internal_classBuilder("Error",{constructor=function(self,G)self.message=G end,toString=function(self)return type(self)..": "..self.message end},{})end;if not _leap_internal_is_operator then _leap_internal_is_operator=function(v,H)if not v or not H then return false end;if _type(v)~="table"then return _type(v)==type(H)end;if _type(H)~="table"then error("leap.is_operator: #2 passed argument must be a class, but got ".._type(H),2)end;if v.__prototype then error("leap.is_operator: #1 passed argument must be a class instance, but got class",2)end;local I=v;while I and I.__type~=H.__type do if I.__parent or I.__prototype.__parent then I=I.__parent or I.__prototype.__parent else return false end end;return true end end;  
 addNumbers = leap.registerfunc(function(numA, numB)if type(numA) ~= "number" then error('numA: must be (number) but got '..type(numA)..'', 2) end;if type(numB) ~= "number" then error('numB: must be (number) but got '..type(numB)..'', 2) end;
     return numA + numB
-end, {args={{name = "numA"},{name = "numB"},},name="addNumbers",has_return=true,})
+end, "addNumbers|numA,numB|r")
 
 local result = addNumbers(1, 2)
 
   
 addNumbers = leap.registerfunc(function(numA, numB)if numA == nil then numA = 1 end;if type(numA) ~= "number" then error('numA: must be (number) but got '..type(numA)..'', 2) end;if numB == nil then numB = 2 end;if type(numB) ~= "number" then error('numB: must be (number) but got '..type(numB)..'', 2) end;
     return numA + numB
-end, {args={{name = "numA"},{name = "numB"},},name="addNumbers",has_return=true,})
+end, "addNumbers|numA,numB|r")
 
 local result = addNumbers()
 
@@ -24,7 +24,7 @@ _leap_internal_classBuilder("Car",{
 
     constructor = leap.registerfunc(function(self, velocity)if velocity == nil then velocity = 100 end;if type(velocity) ~= "number" then error('velocity: must be (number) but got '..type(velocity)..'', 2) end;
         self.velocity = velocity
-    end, {args={{name = "velocity"},},name="constructor",})
+    end, "constructor|velocity|")
 }, {})
 
 _leap_internal_classBuilder("Dragster",{
@@ -32,17 +32,17 @@ _leap_internal_classBuilder("Dragster",{
 
     constructor = leap.registerfunc(function(self)
         Car.__prototype.constructor(self,200)
-    end, {args={},name="constructor",})
+    end, "constructor||")
 }, Car)
 
 _leap_internal_classBuilder("MyError",{
     constructor = leap.registerfunc(function(self, message)if type(message) ~= "string" then error('message: must be (string) but got '..type(message)..'', 2) end;
         self.message = message .. "Test"
-    end, {args={{name = "message"},},name="constructor",}),
+    end, "constructor|message|"),
 
     toString = leap.registerfunc(function(self)
         return "Custom error message "
-    end, {args={},name="toString",has_return=true,})
+    end, "toString||r")
 }, Error)
 
   
@@ -61,7 +61,7 @@ stopwatch = leap.registerfunc(function(func)
         print(name .. " taken "..((os.clock() * 1000) - time).."ms to execute")
         return data
     end
-end, {args={{name = "func"},},name="stopwatch",has_return=true,})
+end, "stopwatch|func|r")
 
  
  someMathIntensiveFunction = leap.registerfunc(function(pow)if pow == nil then pow = 100 end;if type(pow) ~= "number" then error('pow: must be (number) but got '..type(pow)..'', 2) end;
@@ -70,7 +70,7 @@ end, {args={{name = "func"},},name="stopwatch",has_return=true,})
     end
 
     return math.pow(10, pow)
-end, {args={{name = "pow"},},name="someMathIntensiveFunction",has_return=true,});someMathIntensiveFunction = stopwatch(someMathIntensiveFunction) or someMathIntensiveFunction;
+end, "someMathIntensiveFunction|pow|r");someMathIntensiveFunction = stopwatch(someMathIntensiveFunction) or someMathIntensiveFunction;
 
 someMathIntensiveFunction(100)
 
@@ -79,7 +79,7 @@ someMathIntensiveFunction(100)
   {
     constructor = leap.registerfunc(function(self)
         print("MyClass constructor")
-    end, {args={},name="constructor",})
+    end, "constructor||")
 }, {});MyClass = stopwatch(MyClass) or MyClass;
 
     
@@ -87,7 +87,7 @@ _leap_internal_classBuilder("MyClass",{
     
       method = leap.registerfunc(function(self)
         print("MyClass method")
-    end, {args={},name="method",})
+    end, "method||")
 }, {})table.insert(MyClass.__prototype._leap_internal_decorators, {name = "method", decoratorName = "stopwatch", args = {}});
 
   
@@ -170,7 +170,7 @@ end]]
 
 editMessage = leap.registerfunc(function(user)if _type(user) ~= "table" and not _leap_internal_is_operator(user, User) then error('user: must be (User) or a derived class but got '..type(user)..'', 2) end; _leap_internal_using_operator("HaveRightsTo",{self = self,user = user},"editMessage")
     print("Message edited!")
-end, {args={{name = "user"},},name="editMessage",})
+end, "editMessage|user|")
 
    
 _leap_internal_classBuilder("User",{
@@ -206,17 +206,17 @@ end
 
 test = leap.registerfunc(function(a, b)
     print("adw")
-end, {args={{name = "a"},{name = "b"},},name="test",})
+end, "test|a,b|")
 
 _leap_internal_classBuilder("Test2",{
     test = leap.registerfunc(function(self, a, b)
         print("adw")
-    end, {args={{name = "a"},{name = "b"},},name="test",}),
+    end, "test|a,b|"),
 
     
       test2 = leap.registerfunc(function(self, a, b)
         print("adw")
-    end, {args={{name = "a"},{name = "b"},},name="test2",})
+    end, "test2|a,b|")
 }, {})table.insert(Test2.__prototype._leap_internal_decorators, {name = "test2", decoratorName = "test2", args = {}});
 
 
@@ -227,27 +227,27 @@ local MAX_DEPTH = 8
 local  enterDepth = leap.registerfunc(function(self)
     self._depth = (self._depth or 0) + 1
     return self._depth <= MAX_DEPTH
-end, {args={{name = "self"},},name="enterDepth",has_return=true,})
+end, "enterDepth|self|r")
 
 local  exitDepth = leap.registerfunc(function(self)
     self._depth = self._depth - 1
-end, {args={{name = "self"},},name="exitDepth",})
+end, "exitDepth|self|")
 
 _leap_internal_classBuilder("A",{
     constructor = leap.registerfunc(function(self)
         self.log = {}
-    end, {args={},name="constructor",}),
+    end, "constructor||"),
 
     step = leap.registerfunc(function(self)
         print("A: step")
         table.insert(self.log, "A:step")
-    end, {args={},name="step",}),
+    end, "step||"),
 
     run = leap.registerfunc(function(self)
         print("A: run")
         table.insert(self.log, "A:run")
         self:step()
-    end, {args={},name="run",}),
+    end, "run||"),
 }, {})
 
 _leap_internal_classBuilder("B",{
@@ -257,7 +257,7 @@ _leap_internal_classBuilder("B",{
         A.__prototype.step(self)
         print("B: step (after super)")
         table.insert(self.log, "B:step:end")
-    end, {args={},name="step",}),
+    end, "step||"),
 
     run = leap.registerfunc(function(self)
         print("B: run")
@@ -265,7 +265,7 @@ _leap_internal_classBuilder("B",{
         if math.random() > 0.2 then
             A.__prototype.run(self)
         end
-    end, {args={},name="run",}),
+    end, "run||"),
 }, A)
 
 _leap_internal_classBuilder("C",{
@@ -278,7 +278,7 @@ _leap_internal_classBuilder("C",{
             exitDepth(self)
         end
         B.__prototype.step(self)
-    end, {args={},name="step",}),
+    end, "step||"),
 
     run = leap.registerfunc(function(self)
         print("C: run")
@@ -288,7 +288,7 @@ _leap_internal_classBuilder("C",{
             B.__prototype.step(self)
         end
         table.insert(self.log, "C:run:end")
-    end, {args={},name="run",}),
+    end, "run||"),
 }, B)
 
 _leap_internal_classBuilder("D",{
@@ -303,7 +303,7 @@ _leap_internal_classBuilder("D",{
         C.__prototype.step(self)
         print("D: step (end)")
         table.insert(self.log, "D:step:end")
-    end, {args={},name="step",}),
+    end, "step||"),
 
     run = leap.registerfunc(function(self)
         print("D: run")
@@ -314,7 +314,7 @@ _leap_internal_classBuilder("D",{
             exitDepth(self)
         end
         table.insert(self.log, "D:run:end")
-    end, {args={},name="run",}),
+    end, "run||"),
 }, C)
 
 _leap_internal_classBuilder("E",{
@@ -324,7 +324,7 @@ _leap_internal_classBuilder("E",{
         if math.random() > 0.3 then
             D.__prototype.step(self)
         end
-    end, {args={},name="step",}),
+    end, "step||"),
 
     run = leap.registerfunc(function(self)
         print("E: run (start)")
@@ -333,7 +333,7 @@ _leap_internal_classBuilder("E",{
         D.__prototype.run(self)
         print("E: run (end)")
         table.insert(self.log, "E:run:end")
-    end, {args={},name="run",}),
+    end, "run||"),
 }, D)
 
 _leap_internal_classBuilder("F",{
@@ -347,7 +347,7 @@ _leap_internal_classBuilder("F",{
             self:run()
             exitDepth(self)
         end
-    end, {args={},name="step",}),
+    end, "step||"),
 
     run = leap.registerfunc(function(self)
         print("F: run")
@@ -361,7 +361,7 @@ _leap_internal_classBuilder("F",{
         end
         print("F: run (end)")
         table.insert(self.log, "F:run:end")
-    end, {args={},name="run",}),
+    end, "run||"),
 }, E)
 
 

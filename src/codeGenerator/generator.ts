@@ -22,6 +22,8 @@ class CodeGenerator extends LuaListener {
     firstStat: boolean = true
     injecter: Injecter
     currentFunctionParList: ParlistContext
+    currentParNames: string[] = []   // parameter names of the parlist being parsed
+    lastFuncParNames: string[] = []  // parameter names of the last parsed function body
 
     insideClass: string;
     insideClassExtends: string;
@@ -610,7 +612,6 @@ class CodeGenerator extends LuaListener {
 
                 code.lastNode = argslist
                 
-                //console.log("kargs with id ", id, "is", this.kargsTable[id])
                 if (this.kargsTable[id].length > 0) {
                     // Add call for kargs before arguments
                     code.add(`__leap_call_kargs(${this.getFunctionName(null, true)}, {${this.kargsTable[id]}}`)
@@ -659,9 +660,7 @@ class CodeGenerator extends LuaListener {
                 if (Array.isArray(functionName)) functionName.shift();
             }
 
-            const injectArgs = (code) => {
-                this.injecter.injectIfNeeded(code, "enterFunctiondef");
-            }
+            const getArgs = () => this.lastFuncParNames
 
             const functionReturn = () => {
                 const ret = this.functionReturn
@@ -673,7 +672,7 @@ class CodeGenerator extends LuaListener {
                 return ret
             }
 
-            const introspection = CodeSnippets.functionIntrospection(actualFuncname, injectBody, injectArgs, functionReturn)
+            const introspection = CodeSnippets.functionIntrospection(actualFuncname, injectBody, getArgs, functionReturn)
             code.add(introspection)
         }
 
@@ -682,13 +681,18 @@ class CodeGenerator extends LuaListener {
 
     enterFuncbody = (ctx: FuncbodyContext): string => {
         const code = new Code();
-        
+
         code.add(ctx.OP())
+
+        // Names are collected per function: a function without parameters must not inherit the ones of its parent
+        this.currentParNames = []
 
         if (ctx.parlist()) {
             code.add(ctx.parlist(), this.enterParlist);
         }
-        
+
+        const parNames = this.currentParNames
+
         code.add(ctx.CP())
 
         this.injecter.injectIfNeeded(code);
@@ -703,6 +707,9 @@ class CodeGenerator extends LuaListener {
 
         this.currentFunctionParList = null
         if (savedInsideClass) this.insideClass = savedInsideClass;
+
+        // Hand the names to enterFunctiondef; written after the body so nested functions cannot overwrite them
+        this.lastFuncParNames = parNames
 
         return code.get();
     }
@@ -807,12 +814,9 @@ class CodeGenerator extends LuaListener {
             code.add(extendedpar, this.enterExtendedpar)
         })
 
-        // Already convert parlist to strings
-        const parliststr = extendedparlist.map((v) => '{name = "'+this.enterIdentifier(v.identifier())+'"},')
-
-        /// Save the parlist in the function metatable
-        this.injecter.cleanInjects("enterFunctiondef")
-        this.injecter.inNext("enterFunctiondef", parliststr.join(""))
+        // Remember the parameter names of the function being parsed (read back by enterFuncbody).
+        // This is set last on purpose: default values can contain nested functions that overwrite it.
+        this.currentParNames = extendedparlist.map((v) => this.enterIdentifier(v.identifier()))
 
         return code.get();
     };
@@ -921,7 +925,7 @@ class CodeGenerator extends LuaListener {
             }
 
             if (functiondef) {
-                id = this.addFunctionName(funcName);
+                id = this.addFunctionName(funcName, !!ctx.OB());
             }
 
             decorator_list.forEach(decorator => {
@@ -944,7 +948,7 @@ class CodeGenerator extends LuaListener {
             const isfunc = ctx.exp(1).functiondef();
             let id = null;
 
-            if (isfunc) id = this.addFunctionName(this.enterExp(ctx.exp(0)));
+            if (isfunc) id = this.addFunctionName(this.enterExp(ctx.exp(0)), true); // computed key: an expression, not a name
 
             code.add(ctx.OB());
             code.add(ctx.exp(0), this.enterExp);

@@ -70,8 +70,6 @@ class Code {
 
         const spaces = Utils.getSpacesBetweenTokens(fromToken, toToken);
 
-        //console.log("Adding spaces between", from.getText(), "and", to.getText());
-        //console.log(JSON.stringify(spaces));
 
         this.code += spaces
     }

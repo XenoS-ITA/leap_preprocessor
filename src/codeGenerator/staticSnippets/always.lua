@@ -186,8 +186,9 @@ if not skipSerialize then
     skipSerialize = function(class, ignoreList)
         if _type(class) ~= "table" then error("skipSerialize: #1 passed argument must be a class, but got "..type(class), 2) end
 
-        if not class.__prototype.__ignoreList then
-            class.__prototype.__ignoreList = {}
+        if not rawget(class.__prototype, "__ignoreList") then
+            local inherited = class.__prototype.__ignoreList -- the parent's list, copied so the parent stays untouched
+            class.__prototype.__ignoreList = inherited and table.clone(inherited) or {}
         end
 
         if _type(ignoreList) == "table" then
@@ -202,14 +203,49 @@ if not skipSerialize then
     end
 end
 
+-- Generated code registers functions with a constant string "name|arg1,arg2|r" ("r" = has_return) instead of
+-- building a table for every closure. The table is built here, once per distinct string, and shared.
+if not _leap_internal_decodesig then
+    local cache = {}
+
+    _leap_internal_decodesig = function(str)
+        local sig = cache[str]
+        if sig then return sig end
+
+        -- Parameters and flag never contain "|", the name (a runtime key) might, so match from the right
+        local name, params, flag = str:match("^(.*)|([^|]*)|([^|]*)$")
+        local args = {}
+
+        for param in params:gmatch("[^,]+") do
+            args[#args + 1] = { name = param }
+        end
+
+        sig = { args = args, name = name }
+
+        if flag == "r" then
+            sig.has_return = true
+        end
+
+        cache[str] = sig
+        return sig
+    end
+end
+
 if not leap.fsignature then
     leap.fsignature = function(func)
         if _type(func) ~= "function" then
             error("leap.fsignature: passed argument must be a function, but got ".._type(func), 2)
         end
-        
+
         if not __leap__introspection then return nil end
-        return __leap__introspection[func]
+
+        local metadata = __leap__introspection[func]
+
+        if _type(metadata) == "string" then
+            return _leap_internal_decodesig(metadata)
+        end
+
+        return metadata
     end
 end
 
@@ -247,38 +283,61 @@ end
 -- Significantly faster (~50%) than doing actual deepcopy for flat or lightly-nested structures
 
 if not _leap_internal_deepcopy then
+    local _type = _type or type -- the global _type is only set at the end of this file
+    local clone = table.clone
+
     _leap_internal_deepcopy = function(orig, seen, _filter, skipFunctions)
         if _type(orig) ~= "table" then return orig end
         seen = seen or {}
         if seen[orig] then return seen[orig] end
 
-        local copy = table.clone(orig)
+        local copy = clone(orig)
         seen[orig] = copy
 
+        -- The clone already holds every plain value, only tables and removed keys need work
         for k, v in next, orig do
             if _filter and _filter[k] then
                 copy[k] = nil -- skip filtered keys
             else
                 local t = _type(v)
 
-                if t == "function" and skipFunctions then
-                    copy[k] = nil
-                else
-                    if t == "table" then
-                        if v.__type ~= nil and getmetatable(v) then
-                            copy[k] = leap.serialize(v, seen, k)
-                        else
-                            copy[k] = _leap_internal_deepcopy(v, seen, _filter, skipFunctions)
-                        end
+                if t == "table" then
+                    if v.__type ~= nil and getmetatable(v) then
+                        copy[k] = leap.serialize(v, seen, k)
                     else
-                        copy[k] = v
+                        copy[k] = _leap_internal_deepcopy(v, seen, _filter, skipFunctions)
                     end
+                elseif t == "function" and skipFunctions then
+                    copy[k] = nil
                 end
-
             end
         end
 
         return copy
+    end
+end
+
+-- Copy of a class table field: a table without nested tables is just a shallow clone (no "seen" table needed)
+if not _leap_internal_copyfield then
+    local _type = _type or type
+    local clone = table.clone
+
+    _leap_internal_copyfield = function(orig)
+        if _type(orig) ~= "table" then return orig end
+
+        local empty = true
+
+        for _, v in next, orig do
+            if _type(v) == "table" then
+                return _leap_internal_deepcopy(orig)
+            end
+
+            empty = false
+        end
+
+        if empty then return {} end -- table.clone never keeps the metatable either
+
+        return clone(orig)
     end
 end
 
