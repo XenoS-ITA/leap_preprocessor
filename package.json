@@ -9,7 +9,8 @@
     "startdbg": "npm run build && node --enable-source-maps scripts/test.js",
     "startfull": "npm run build:grammar && npm run build && node scripts/test.js",
     "build:grammar": "antlr -o src/grammar -Dlanguage=TypeScript grammar/leap/LuaLexer.g4 grammar/leap/LuaParser.g4",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "test": "npm run build && node tests/run.js"
   },
   "license": "ISC",
   "dependencies": {
